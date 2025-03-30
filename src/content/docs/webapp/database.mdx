@@ -1,0 +1,58 @@
+---
+title: Database Design
+description: Database architecture for CTF FlagFrenzy
+---
+
+# Database Design
+
+CTF FlagFrenzy uses a relational database structure to store all platform data.
+
+## Schema Overview
+
+Our database schema includes several key tables:
+
+- **Users**: Player and administrator accounts
+- **Teams**: Group information and membership
+- **Challenges**: Challenge metadata and configuration
+- **Submissions**: Flag submission attempts and results
+- **Events**: Competition details and schedules
+- **Notifications**: System and admin announcements
+
+## Data Models
+
+### User Model
+
+`	ypescript
+interface User {
+  id: string;
+  username: string;
+  email: string;
+  passwordHash: string;
+  role: 'admin' | 'player';
+  teamId?: string;
+  createdAt: Date;
+  lastLogin: Date;
+}
+`
+
+### Challenge Model
+
+`	ypescript
+interface Challenge {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  points: number;
+  flags: string[];
+  hints: string[];
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+`
+
+## Data Flow
+
+[Diagram and description of database interactions]
