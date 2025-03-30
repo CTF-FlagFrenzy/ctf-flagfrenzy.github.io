@@ -89,7 +89,7 @@ export default defineConfig({
                 { label: 'Solana_Assets', link: '/challenges/web-challenge/solana-assets' },
                 { label: 'The_SQL_Heist', link: '/challenges/web-challenge/the-sql-heist' },
                 { label: 'File_And_Seek', link: '/challenges/web-challenge/file-and-seek' },
-                { label: 'Shadow_File', link: '/challenges/web-challenge/shadow-file' }
+                { label: 'Shadow_File', link: '/challenges/web-challenge/shadow-file' },
               ]
             },
             {
@@ -98,7 +98,7 @@ export default defineConfig({
                 { label: 'Security_Maths', link: '/challenges/others/security-maths' },
                 { label: 'Hidden_Job', link: '/challenges/others/hidden-job' },
                 { label: 'Decryption_Master', link: '/challenges/others/decryption-master' },
-                { label: 'The_Neverending_Zip', link: '/challenges/others/the-neverending-zip' }
+                { label: 'The_Neverending_Zip', link: '/challenges/others/the-neverending-zip' },
               ]
             },
             {
@@ -106,7 +106,7 @@ export default defineConfig({
               items: [
                 { label: 'Ceasar_Cypher', link: '/challenges/cryptography/ceasar-cypher' },
                 { label: 'Binary_Puzzeling', link: '/challenges/cryptography/binary-puzzeling' },
-                { label: 'Checking_Encryption', link: '/challenges/cryptography/checking-encryption' }
+                { label: 'Checking_Encryption', link: '/challenges/cryptography/checking-encryption' },
               ]
             },
             {
@@ -116,7 +116,7 @@ export default defineConfig({
                 { label: 'Mental_Overflow', link: '/challenges/reversing/mental-overflow' },
                 { label: 'Shell_Assembly', link: '/challenges/reversing/shell-assembly' },
                 { label: 'Corrupted_File', link: '/challenges/reversing/corrupted-file' },
-                { label: 'PYCked_Apart', link: '/challenges/reversing/pycked-apart' }
+                { label: 'PYCked_Apart', link: '/challenges/reversing/pycked-apart' },
               ]
             },
             {
@@ -127,13 +127,13 @@ export default defineConfig({
                 { label: 'Stealth_Invoice', link: '/challenges/forensics/stealth-invoice' },
                 { label: 'Transmission_Received', link: '/challenges/forensics/transmission-received' },
                 { label: 'Phantom_Frequency', link: '/challenges/forensics/phantom-frequency' },
-                { label: 'Capture_the_Bytes', link: '/challenges/forensics/capture-the-bytes' }
+                { label: 'Capture_the_Bytes', link: '/challenges/forensics/capture-the-bytes' },
               ]
             },
             {
               label: 'Steganography',
               items: [
-                { label: 'Hidden_Frequencies', link: '/challenges/steganography/hidden-frequencies' }
+                { label: 'Hidden_Frequencies', link: '/challenges/steganography/hidden-frequencies' },
               ]
             },
             {
@@ -147,7 +147,7 @@ export default defineConfig({
             {
               label: 'Blockchain',
               items: [
-                { label: 'Solana_Dumb_Contract', link: '/challenges/blockchain/solana-dumb-contract' }
+                { label: 'Solana_Dumb_Contract', link: '/challenges/blockchain/solana-dumb-contract' },
               ]
             }
           ],
