@@ -1,3 +1,82 @@
+/* Left Sidebar Navigation */
+.md-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 300px;
+  height: 100%;
+  z-index: 2;
+}
+
+.md-header__inner {
+  height: 100%;
+  flex-direction: column;
+  padding: 1.5rem 1rem;
+}
+
+.md-header__title {
+  margin-bottom: 2rem;
+}
+
+.md-header__button {
+  margin: 0.5rem 0;
+}
+
+.md-header-nav__button {
+  margin: 0.5rem 0;
+}
+
+.md-search {
+  margin: 1rem 0;
+  width: 100%;
+}
+
+.md-search__inner {
+  width: 100%;
+}
+
+/* Adjust main content for sidebar */
+.md-main {
+  margin-left: 300px;
+  width: calc(100% - 300px);
+}
+
+.md-main__inner {
+  padding-top: 0;
+}
+
+.md-content {
+  width: 100%;
+}
+
+/* Mobile responsiveness for the sidebar */
+@media screen and (max-width: 959px) {
+  .md-header {
+    position: sticky;
+    width: 100%;
+    height: auto;
+  }
+  
+  .md-header__inner {
+    flex-direction: row;
+    padding: 0.5rem 1rem;
+  }
+  
+  .md-main {
+    margin-left: 0;
+    width: 100%;
+  }
+  
+  .md-sidebar--primary {
+    left: -242px;
+    transition: left 0.25s;
+  }
+  
+  .md-sidebar--primary.md-sidebar--open {
+    left: 0;
+  }
+}
+
 /* Hero Section */
 .hero-container {
   display: flex;
@@ -9,19 +88,25 @@
 }
 
 .hero-logo img {
-  max-width: 200px;
+  max-width: 300px; /* Increased from 200px */
   margin-bottom: 2rem;
+  transition: transform 0.3s ease;
+}
+
+.hero-logo img:hover {
+  transform: scale(1.05);
 }
 
 .hero-text h1 {
-  font-size: 3rem;
+  font-size: 3.2rem; /* Slightly larger */
   margin-bottom: 1rem;
+  font-weight: 700;
 }
 
 .hero-text p {
-  font-size: 1.2rem;
+  font-size: 1.3rem; /* Slightly larger */
   margin-bottom: 2rem;
-  opacity: 0.8;
+  opacity: 0.9;
 }
 
 .hero-buttons {
@@ -40,49 +125,60 @@
 }
 
 .feature-card {
-  padding: 1.5rem;
-  border-radius: 8px;
-  background-color: var(--md-primary-fg-color--light);
-  color: var(--md-primary-bg-color);
-  transition: transform 0.3s ease;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  padding: 1.8rem; /* More padding */
+  border-radius: 10px; /* Slightly more rounded */
+  background-color: #2d2d3d; /* Dark color for light mode too */
+  color: #ffffff;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  border-top: 3px solid var(--md-primary-fg-color);
 }
 
 .feature-card:hover {
   transform: translateY(-5px);
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
 }
 
 .feature-icon {
-  font-size: 2rem;
-  margin-bottom: 1rem;
+  font-size: 2.5rem; /* Bigger icons */
+  margin-bottom: 1.2rem;
+  color: var(--md-primary-fg-color);
 }
 
 .feature-card h3 {
   margin: 0.5rem 0;
-  font-size: 1.3rem;
+  font-size: 1.4rem;
+  font-weight: 600;
 }
 
 .feature-card p {
   opacity: 0.9;
-  font-size: 0.95rem;
+  font-size: 1rem;
+  line-height: 1.5;
 }
 
 /* About Section */
 .about-section {
-  margin-top: 4rem;
+  margin-top: 5rem;
   text-align: center;
-  padding: 2rem 0;
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 2.5rem 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .footer-logo {
-  max-width: 150px;
-  margin-top: 1rem;
+  max-width: 180px; /* Bigger footer logo */
+  margin-top: 1.5rem;
+  opacity: 0.9;
+  transition: opacity 0.3s ease;
 }
 
-/* Dark mode support */
+.footer-logo:hover {
+  opacity: 1;
+}
+
+/* Dark mode support - already dark for both modes */
 [data-md-color-scheme="slate"] .feature-card {
-  background-color: var(--md-primary-fg-color--dark);
+  background-color: #252535; /* Even darker for dark mode */
 }
 
 /* Make it responsive */
@@ -93,8 +189,12 @@
     text-align: left;
   }
   
+  .hero-logo img {
+    max-width: 400px; /* Even bigger on desktop */
+  }
+  
   .hero-text {
-    max-width: 500px;
+    max-width: 550px; /* More width for text */
   }
   
   .hero-buttons {
