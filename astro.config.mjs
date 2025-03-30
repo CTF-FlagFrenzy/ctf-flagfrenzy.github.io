@@ -1,7 +1,5 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
-import remarkGfm from 'remark-gfm';
-import remarkGithubAdmonitions from 'remark-github-beta-blockquote-admonitions';
 
 export default defineConfig({
   site: 'https://ctf-flagfrenzy.github.io',
