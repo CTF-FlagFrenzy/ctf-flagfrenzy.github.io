@@ -30,6 +30,9 @@ theme:
     - navigation.sections
     - navigation.top
     - navigation.tracking
+    - navigation.indexes
+    - navigation.tabs.sticky
+    - toc.integrate
     - search.highlight
     - search.share
     - content.code.copy
