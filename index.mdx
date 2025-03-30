@@ -1,7 +1,8 @@
----
-layout: home
-title: Welcome to FlagFreny CTF
----
+import Layout from './components/Layout'
+
+export default function HomePage({ children }) {
+  return <Layout title="Welcome to FlagFreny CTF">{children}</Layout>
+}
 
 # Welcome to FlagFreny CTF
 
@@ -22,5 +23,3 @@ FlagFreny CTF is a group of cybersecurity enthusiasts who participate in CTF com
 ## Join Our Community
 
 [GitHub](https://github.com/ctf-flagfreny)
-
-

@@ -27,28 +27,22 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v4
       
-      - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          ruby-version: '3.1'
-          bundler-cache: true
+          node-version: '18'
+          cache: 'npm'
       
-      - name: Install Jekyll
-        run: |
-          gem install jekyll bundler
-          bundle init
-          bundle add jekyll --version "~>4.2"
-          bundle install
+      - name: Install dependencies
+        run: npm ci
       
-      - name: Build with Jekyll
-        run: bundle exec jekyll build
-        env:
-          JEKYLL_ENV: production
+      - name: Build with Next.js
+        run: npm run build
       
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '_site'
+          path: 'out'
 
   deploy:
     environment:
