@@ -1,26 +1,21 @@
-// filepath: c:\Users\manag\Documents\GitHub\ctf-flagfreny.github.io\README.md
 # CTF FlagFrenzy Website
 
-This repository contains the source code for the CTF FlagFrenzy website, a resource for capture the flag challenges and cybersecurity learning.
+This repository contains the source code for the CTF FlagFrenzy website, a platform dedicated to Capture The Flag challenges and cybersecurity education.
 
-## Development
+## Local Development
 
-The website is built with plain HTML, CSS, and JavaScript.
+To set up this site locally:
 
-To work on this project locally:
+1. Install Ruby and Bundler
+2. Clone this repository
+3. Run `bundle install` to install dependencies
+4. Run `bundle exec jekyll serve` to start the local server
+5. Visit `http://localhost:4000` in your browser
 
-1. Clone the repository
-2. Make your changes
-3. Push to the main branch to trigger the automatic deployment
+## Contributing
 
-## Deployment
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-This website is automatically deployed to GitHub Pages using GitHub Actions. The workflow runs on every push to the main branch.
+## License
 
-## Structure
-
-- `index.html` - Main page
-- `css/` - Stylesheets
-- `js/` - JavaScript files
-- `img/` - Images and other media
-
+This project is licensed under the MIT License - see the LICENSE file for details.

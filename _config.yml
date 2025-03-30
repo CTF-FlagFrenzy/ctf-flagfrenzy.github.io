@@ -1,31 +1,23 @@
-﻿# Site settings
-title: CTF FlagFrenzy
-description: CTF Challenge Platform
-url: "https://ctf-flagfreny.github.io"
+﻿title: CTF FlagFrenzy
+email: your-email@example.com
+description: >-
+  A website dedicated to Capture The Flag challenges and cybersecurity resources.
+baseurl: "" # the subpath of your site, e.g. /blog
+url: "https://ctf-flagfreny.github.io" # the base hostname & protocol
+github_username: ctf-flagfreny
 
 # Build settings
-markdown: kramdown
-remote_theme: pages-themes/minimal@v0.2.0
+theme: minima
 plugins:
-  - jekyll-remote-theme
   - jekyll-feed
   - jekyll-seo-tag
 
-# Theme customization
-show_downloads: false
-
-# Set index file explicitly
-index_page: index.mdx
-
-# Include mdx files in processing
-include:
-  - "*.mdx"
-
 # Exclude from processing
 exclude:
-  - .github/
+  - .sass-cache/
+  - .jekyll-cache/
+  - gemfiles/
   - Gemfile
   - Gemfile.lock
-  - vendor/
   - node_modules/
-  - README.md  # Exclude README.md from being used as homepage
+  - vendor/
