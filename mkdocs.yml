@@ -1,0 +1,77 @@
+﻿site_name: FlagFrenzy CTF
+site_url: https://ctf-flagfreny.github.io/
+site_description: A Capture The Flag community focused on cybersecurity challenges and learning
+site_author: FlagFrenzy Team
+
+repo_name: ctf-flagfreny/ctf-flagfreny.github.io
+repo_url: https://github.com/ctf-flagfreny/ctf-flagfreny.github.io
+
+theme:
+  name: material
+  palette:
+    # Light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/toggle-switch-off-outline
+        name: Switch to dark mode
+    # Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - search.share
+    - content.code.copy
+  icon:
+    repo: fontawesome/brands/github
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences 
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+  - attr_list
+  - md_in_html
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+
+plugins:
+  - search
+  - social
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/ctf-flagfreny
+    - icon: fontawesome/brands/twitter
+      link: https://twitter.com/flagfreny
+    - icon: fontawesome/brands/discord
+      link: https://discord.gg/flagfreny
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - CTF Guides:
+    - Web Exploitation: guides/web-exploitation.md
+    - Cryptography: guides/cryptography.md
+    - Reverse Engineering: guides/reverse-engineering.md
+    - Binary Exploitation: guides/binary-exploitation.md
+    - Forensics: guides/forensics.md
+  - Writeups: writeups.md
+  - About: about.md
