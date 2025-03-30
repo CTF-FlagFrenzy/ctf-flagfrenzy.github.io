@@ -1,11 +1,10 @@
-name: Deploy to GitHub Pages
+name: Deploy Starlight to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   workflow_dispatch:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
   pages: write
@@ -18,11 +17,7 @@ jobs:
       - name: Checkout your repository using git
         uses: actions/checkout@v3
       - name: Install, build, and upload your site
-        uses: withastro/action@v1
-        with:
-          path: . # The root location of your Astro project inside the repository
-          node-version: 18 # The specific version of Node that should be used to build your site
-          package-manager: npm # The Node package manager that should be used to install dependencies and build your site
+        uses: withastro/action@v0
 
   deploy:
     needs: build
@@ -33,4 +28,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v2
+        uses: actions/deploy-pages@v1
