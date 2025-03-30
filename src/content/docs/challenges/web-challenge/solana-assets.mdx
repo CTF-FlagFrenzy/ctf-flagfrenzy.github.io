@@ -132,7 +132,7 @@ def dashboard(request):
     else:
         combined_flag = challengeflag + teamflag
         hashed_flag = hashlib.sha256(combined_flag.encode()).hexdigest()
-        logging.info(f"Hashed Flag: {hashed_flag}")
+        logging.info(f"Hashed Flag: { hashed_flag }")
         response = render(request, "Solana/dashboard.html")
         
         for cookie in request.COOKIES:
