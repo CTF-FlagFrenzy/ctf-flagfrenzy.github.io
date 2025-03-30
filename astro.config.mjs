@@ -41,18 +41,42 @@ export default defineConfig({
 					label: 'Infrastructure',
           items: [
             { label: 'Infrastructure | Overview', link: '/infrastructure/overview' },
-            { label: 'Architecture', link: '/infrastructure/architecture' },
-            { label: 'Deployment', link: '/infrastructure/deployment' },
-            { label: 'Monitoring', link: '/infrastructure/monitoring' },
+            { 
+              label: 'Registry',
+              items: [
+                { label: 'Registry | Overview', link: '/infrastructure/registry/overview' },
+              ]
+            },
+            {
+              label: 'Cluster',
+              items: [
+                { label: 'Cluster | Overview', link: '/infrastructure/cluster/overview' },
+              ]
+            },
           ],
 				},
 				{
 					label: 'Webapp',
 					items: [
             { label: 'Webapp | Overview', link: '/webapp/overview' },
-            { label: 'Frontend', link: '/webapp/frontend' },
-            { label: 'Backend', link: '/webapp/backend' },
-            { label: 'Database', link: '/webapp/database' },
+            { 
+              label: 'Frontend',
+              items: [
+                { label: 'Frontend | Overview', link: '/webapp/frontend/overview' },
+              ]
+            },
+            {
+              label: 'Backend',
+              items: [
+                { label: 'Backend | Overview', link: '/webapp/backend/overview' },
+              ]
+            },
+            {
+              label: 'Anti Cheat',
+              items: [
+                { label: 'Anti Cheat | Overview', link: '/challenges/anti-cheat/overview' },
+              ]
+            },
 					],
 				},
         {
