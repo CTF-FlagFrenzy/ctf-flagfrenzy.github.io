@@ -23,7 +23,7 @@ New to CTF competitions? Check out our [Getting Started](getting-started.md) gui
 
 ## Join Our Community
 
-- [GitHub](#): Access our tools, resources, and challenge repositories
+- [GitHub](https://github.com/ctf-flagfrenzy): Access our tools, resources, and challenge repositories
 
 ## Upcoming Events
 
