@@ -38,6 +38,21 @@ theme:
     - content.code.copy
   icon:
     repo: fontawesome/brands/github
+  favicon: assets/images/favicon.png
+  logo: assets/images/logo.png
+  font:
+    text: Roboto
+    code: Roboto Mono
+  # Include material icons
+  icons:
+    - name: material/security
+    - name: material/school
+    - name: material/people
+    - name: material/leaderboard
+
+# Additional CSS
+extra_css:
+  - assets/stylesheets/custom.css
 
 markdown_extensions:
   - pymdownx.highlight:
