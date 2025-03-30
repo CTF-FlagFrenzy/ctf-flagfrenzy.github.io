@@ -6,20 +6,6 @@ import remarkGithubAdmonitions from 'remark-github-beta-blockquote-admonitions';
 export default defineConfig({
   site: 'https://ctf-flagfrenzy.github.io',
   base: '/',  // Explicitly set the base path
-  markdown: {
-    remarkPlugins: [
-      remarkGfm,
-      [remarkGithubAdmonitions, {
-        classNameMaps: {
-          note: 'note',
-          tip: 'tip',
-          important: 'important',
-          warning: 'warning',
-          caution: 'caution'
-        }
-      }]
-    ],
-  },
   integrations: [
     starlight({
       title: 'CTF-FlagFrenzy',
