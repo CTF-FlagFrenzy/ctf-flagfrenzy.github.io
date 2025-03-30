@@ -5,6 +5,12 @@ on:
     branches: [ main ]
   # Removed pull_request trigger to avoid duplicate runs
   workflow_dispatch:
+    inputs:
+      use_jekyll:
+        description: 'Use Jekyll instead of Next.js'
+        required: false
+        default: 'false'
+        type: boolean
 
 permissions:
   contents: read
@@ -26,24 +32,48 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v4
       
+      # Option 1: Next.js build (current setup)
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
+        if: ${{ inputs.use_jekyll != 'true' }}
       
       - name: Install dependencies
         run: npm install
+        if: ${{ inputs.use_jekyll != 'true' }}
       
       - name: Build with Next.js
         run: npm run build
+        if: ${{ inputs.use_jekyll != 'true' }}
+      
+      # Option 2: Jekyll build
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+        if: ${{ inputs.use_jekyll == 'true' }}
+        
+      - name: Install Jekyll and dependencies
+        run: |
+          gem install jekyll bundler
+          bundle install
+        if: ${{ inputs.use_jekyll == 'true' }}
+        
+      - name: Build with Jekyll
+        run: bundle exec jekyll build
+        env:
+          JEKYLL_ENV: production
+        if: ${{ inputs.use_jekyll == 'true' }}
       
       - name: List output directory
-        run: ls -la out/
+        run: ls -la ${{ inputs.use_jekyll == 'true' && '_site' || 'out' }}/
       
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: 'out'
+          path: ${{ inputs.use_jekyll == 'true' && '_site' || 'out' }}
 
   deploy:
     environment:

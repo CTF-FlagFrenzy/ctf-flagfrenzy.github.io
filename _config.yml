@@ -1,15 +1,25 @@
 ﻿# Site settings
-title: Your Site Title
-description: Your site description
-baseurl: ""
-url: ""
+title: CTF FlagFrenzy
+description: CTF Challenge Platform
+url: "https://ctf-flagfreny.github.io"
 
 # Build settings
 markdown: kramdown
-theme: minima
+remote_theme: pages-themes/minimal@v0.2.0
 plugins:
+  - jekyll-remote-theme
   - jekyll-feed
   - jekyll-seo-tag
+
+# Theme customization
+show_downloads: false
+
+# Set index file explicitly
+index_page: index.mdx
+
+# Include mdx files in processing
+include:
+  - "*.mdx"
 
 # Exclude from processing
 exclude:
@@ -17,3 +27,5 @@ exclude:
   - Gemfile
   - Gemfile.lock
   - vendor/
+  - node_modules/
+  - README.md  # Exclude README.md from being used as homepage

@@ -1,0 +1,12 @@
+---
+layout: default
+---
+
+{% if site.index_page %}
+  {% assign index_file = site.index_page %}
+{% else %}
+  {% assign index_file = "index.mdx" %}
+{% endif %}
+
+{% capture content %}{% include_relative {{index_file}} %}{% endcapture %}
+{{ content | markdownify }}
