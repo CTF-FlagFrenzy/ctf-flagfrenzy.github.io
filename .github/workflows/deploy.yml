@@ -27,14 +27,28 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v3
       
-      - name: Build
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.1'
+          bundler-cache: true
+      
+      - name: Install Jekyll
         run: |
-          echo "No build step required for simple HTML/CSS/JS site"
+          gem install jekyll bundler
+          bundle init
+          bundle add jekyll --version "~>4.2"
+          bundle install
+      
+      - name: Build with Jekyll
+        run: bundle exec jekyll build
+        env:
+          JEKYLL_ENV: production
       
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
         with:
-          path: '.'
+          path: '_site'
 
   deploy:
     environment:

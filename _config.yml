@@ -1,0 +1,19 @@
+﻿# Site settings
+title: Your Site Title
+description: Your site description
+baseurl: ""
+url: ""
+
+# Build settings
+markdown: kramdown
+theme: minima
+plugins:
+  - jekyll-feed
+  - jekyll-seo-tag
+
+# Exclude from processing
+exclude:
+  - .github/
+  - Gemfile
+  - Gemfile.lock
+  - vendor/
