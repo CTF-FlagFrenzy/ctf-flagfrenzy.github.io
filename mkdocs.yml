@@ -4,7 +4,7 @@ site_description: A Capture The Flag community focused on cybersecurity challeng
 site_author: FlagFrenzy Team
 
 repo_name: ctf-flagfreny/ctf-flagfreny.github.io
-repo_url: https://github.com/ctf-flagfreny/ctf-flagfreny.github.io
+repo_url: https://github.com/CTF-FlagFrenzy
 
 theme:
   name: material

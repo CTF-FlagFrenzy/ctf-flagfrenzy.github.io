@@ -13,14 +13,3 @@ FlagFrenzy is maintained by a group of cybersecurity enthusiasts, professionals,
 - **Competition**: Organize engaging CTF events for all skill levels
 - **Growth**: Help participants develop practical skills for careers in cybersecurity
 
-## Contact Us
-
-For inquiries, suggestions, or collaboration opportunities, please reach out to us at:
-
-- Email: [contact@flagfrenzy.com](mailto:contact@flagfrenzy.com)
-- Twitter: [@flagfrenzy](https://twitter.com/flagfrenzy)
-- Discord: [FlagFrenzy Community Server](#)
-
-## Contribute
-
-We welcome contributions to our documentation, challenges, and resources! Check out our [GitHub repository](https://github.com/ctf-flagfreny/ctf-flagfreny.github.io) to get involved.
