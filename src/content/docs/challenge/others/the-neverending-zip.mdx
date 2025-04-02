@@ -1,5 +1,5 @@
 ---
-title: "CTF FlagFrenzy | The Neverending Zip Challenge: Easy Level"
+title: "CTF Reversing | The Neverending Zip Challenge: Easy Level"
 description: The Neverending Zip challenge
 ---
 
@@ -13,6 +13,28 @@ The challenge consists of:
 3. A containerized deployment environment
 
 The application is containerized using Docker and deployed using Docker Compose, making it portable and easy to deploy consistently across different environments.
+
+#### Directory Structure
+
+```
+The_Neverending_Zip/
+├── docker-compose.yml       
+├── test_The_Neverending_Zip.md  
+├── The_Neverending_Zip.md   
+├── writeup.md             
+├── flask_app/
+│   ├── app.py              
+│   ├── create_zip.py        
+│   ├── Dockerfile          
+│   ├── requirements.txt   
+│   ├── unzip.py            
+│   ├── templates/
+│   │   └── index.html      
+│   ├── unzip/
+│   │   └── HaveFun.zip      
+│   └── zip/
+│       └── .gitkeep         
+```
 
 ## Components
 

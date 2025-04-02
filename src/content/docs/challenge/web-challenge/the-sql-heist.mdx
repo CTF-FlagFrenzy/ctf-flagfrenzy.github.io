@@ -8,6 +8,46 @@ The web app allows users to search for articles using a query, but the query is 
 making it susceptible to SQL injection attacks.
 The challenge focuses on understanding and exploiting SQL injection vulnerabilities to gain unauthorized access to the flag stored within the system.
 
+#### Directory Structure
+
+```
+The_SQL_Heist/
+├── docker-compose.yml           
+├── test_The_SQL_Heist.md       
+├── The_SQL_Heist.md            
+├── writeup.md               
+├── media/                   
+│   ├── image.png                
+│   └── image-1.png              
+└── django/                   
+    ├── db.sqlite3          
+    ├── Dockerfile               
+    ├── manage.py               
+    ├── requirements.txt         
+    ├── The_SQL_Heist/           
+    │   ├── __init__.py
+    │   ├── asgi.py              
+    │   ├── settings.py          
+    │   ├── urls.py              
+    │   ├── wsgi.py              
+    │   └── __pycache__/
+    └── The_SQL_Heist_App/       
+        ├── __init__.py
+        ├── admin.py             
+        ├── apps.py              
+        ├── models.py            
+        ├── urls.py              
+        ├── views.py             
+        ├── migrations/          
+        │   ├── __init__.py
+        │   ├── 0001_initial.py
+        │   ├── 0002_auto_20241024_2007.py
+        │   └── 0003_article_flag.py
+        └── templates/           # HTML templates
+            └── SQL_Heist/
+                └── index.html   # Main page template
+
+```
 
 ### Docker Configuration
 
@@ -36,6 +76,7 @@ services:
     environment:
       - TEAMKEY=XXXXXXX
 ```
+
 
 ### Web Application Frontend
 
@@ -166,9 +207,6 @@ class Article(models.Model):
 ```
 
 ### Installation (For Local Testing)
-
-> [!NOTE]
-> Make sure to install docker and docker-compose first
 
 **Linux**
 

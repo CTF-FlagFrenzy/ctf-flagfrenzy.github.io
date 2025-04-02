@@ -11,33 +11,6 @@ typical security protections like HTTP-only cookies and obfuscation that you'll 
 
 This challenge consists of a Django web application running in a Docker container.
 
-#### Dockerfile Configuration
-
-```yml
-version: '3'
-
-volumes:
-  my-django-data:
-
-services:
-  web:
-    build:
-      context: .
-      dockerfile: django/Dockerfile
-
-    volumes:
-      - my-django-data:/media
-
-    working_dir: '/code'
-
-    ports:
-      - '8000:8000'
-
-    environment:
-      - TEAMKEY=XXXXXXX
-      - CHALLENGEKEY=CTF_CHALLENGE_2023
-```
-
 #### Directory Structure
 
 ```
@@ -69,6 +42,35 @@ Solana_Assets/
 ├── docker-compose.yml
 └── README.md
 ```
+
+#### Dockerfile Configuration
+
+```yml
+version: '3'
+
+volumes:
+  my-django-data:
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: django/Dockerfile
+
+    volumes:
+      - my-django-data:/media
+
+    working_dir: '/code'
+
+    ports:
+      - '8000:8000'
+
+    environment:
+      - TEAMKEY=XXXXXXX
+      - CHALLENGEKEY=CTF_CHALLENGE_2023
+```
+
+
 
 ### Web Application Overview
 
@@ -181,9 +183,6 @@ The key insight to solving this challenge is to realize that:
 4. Submit the flag in the format `FF{hash_value}`
 
 ### Installation (For Local Testing)
-
-> [!NOTE]
-> Make sure to install docker and docker-compose first
 
 **Linux**
 

@@ -5,6 +5,27 @@ description: Shadow File challenge
 
 In this challenge, participants must find a hidden file within a web application. The hidden file contains information about various cryptocurrency products, and each product's ID section holds a part of the flag. These flag parts are hex-encoded and shuffled, and the "units" field in each product contains the information needed to arrange the parts in the correct order. The challenge involves web reconnaissance techniques to locate the hidden file and cryptographic knowledge to decode and reassemble the flag.
 
+#### Directory Structure
+
+```
+docker-compose.yml
+Shadow_File.md
+test_Shadow_File.md
+writeup.md
+flask_app/
+    __init__.py
+    app.py
+    create_json.py
+    Dockerfile
+    products.json
+    requirements.txt
+    hidden/
+        .gitkeep
+    templates/
+        index.html
+media/
+```
+
 ### Docker Compose
 
 The `docker-compose.yml` file sets up the environment for the challenge by starting the Flask service on port 80:
@@ -222,9 +243,6 @@ The HTML template (`index.html`) creates a financial dashboard as a decoy, showi
 ```
 
 ### Installation (For Local Testing)
-
-> [!NOTE]
-> Make sure to install docker and docker-compose first
 
 **Linux**
 
