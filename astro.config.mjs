@@ -112,7 +112,6 @@ export default defineConfig({
                 { label: 'Stealth Invoice', link: '/challenge/forensics/stealth-invoice' },
                 { label: 'Transmission Received', link: '/challenge/forensics/transmission-received' },
                 { label: 'Phantom Frequency', link: '/challenge/forensics/phantom-frequency' },
-                { label: 'Capture the Bytes', link: '/challenge/forensics/capture-the-bytes' },
               ]
             },
             {
