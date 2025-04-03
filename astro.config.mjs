@@ -84,6 +84,7 @@ export default defineConfig({
                 { label: 'Hidden Job', link: '/challenge/others/hidden-job' },
                 { label: 'Decryption Master', link: '/challenge/others/decryption-master' },
                 { label: 'The Neverending Zip', link: '/challenge/others/the-neverending-zip' },
+                { label: 'Solana Dumb Contract', link: '/challenge/others/solana-dumb-contract' }, 
               ]
             },
             {
@@ -128,12 +129,6 @@ export default defineConfig({
                 { label: 'Git Secrets', link: '/challenge/osint/git-secrets' },
               ]
             },
-            {
-              label: 'Blockchain',
-              items: [
-                { label: 'Solana Dumb Contract', link: '/challenge/blockchain/solana-dumb-contract' },
-              ]
-            }
           ],
 				},
 				{

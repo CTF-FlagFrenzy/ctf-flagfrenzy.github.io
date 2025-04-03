@@ -3,88 +3,42 @@ title: "CTF Web-Challenge | File And Seek: Medium"
 description: File And Seek challenge
 ---
 
-In this challenge, participants need to find a hidden file within a web application. The hidden file contains information about various cryptocurrency products, and each product's ID section contains a part of the flag. The challenge involves using web enumeration tools to locate the hidden file and then extracting and assembling the flag from the product IDs.
+File And Seek is a Capture The Flag (CTF) challenge designed to test participants' web enumeration skills. In this challenge, participants need to find a hidden file within a web application that contains cryptocurrency product information. Each product's ID section contains a part of the flag, which must be assembled to complete the challenge.
 
 #### Directory Structure
 
 ```
-docker-compose.yml
-File_And_Seek.md
-test_File_And_Seek.md
-writeup.md
-flask_app/
-    __init__.py
-    app.py
-    create_json.py
-    Dockerfile
-    products.json
-    requirements.txt
-    hidden/
-        .gitkeep
-    templates/
-        index.html
-media/
+File_And_Seek/
+├── docker-compose.yml
+├── File_And_Seek.md
+├── test_File_And_Seek.md
+├── writeup.md
+└── flask_app/
+    ├── __init__.py
+    ├── app.py
+    ├── create_json.py
+    ├── Dockerfile
+    ├── products.json
+    ├── requirements.txt
+    ├── hidden/
+    │   └── .gitkeep
+    └── templates/
+        └── index.html
+└── media/
 ```
 
-### Docker Compose Configuration
+## Technical Implementation
 
-The `docker-compose.yml` file sets up the environment for the challenge by building and running the Flask application:
+### Architecture
+The challenge uses a microservice architecture built with the following components:
 
-```yaml
-version: '3'
+1. **Web Server** (`app.py`): A Flask application that serves the main page and hidden file.
+2. **Flag Generator** (`create_json.py`): A Python script that generates the encoded flag and embeds it in product IDs.
+3. **Containerization** (`Dockerfile` and `docker-compose.yml`): Configuration for deployment and isolation.
 
-volumes:
-  my-django-data:
+### Component 1: Web Server (`app.py`)
 
-services:
-  flask:
-    build:
-      context: .
-      dockerfile: flask_app/Dockerfile
-
-    ports:
-      - '80:80'
-
-    environment:
-      - TEAMKEY=XXXXXXX  # This value is replaced with a unique team key in the actual challenge
-```
-
-The TEAMKEY environment variable provides a unique value that is combined with the challenge key to generate a unique flag for each team.
-
-
-
-### Dockerfile Implementation
-
-The Dockerfile builds the Python environment for the Flask application:
-
-```dockerfile
-FROM python:3
-
-# Copy and install requirements
-COPY flask_app/requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy application code and set working directory
-COPY . code
-WORKDIR /code
-
-EXPOSE 80
-
-# Run the Flask application
-ENTRYPOINT ["python", "flask_app/app.py"]
-CMD ["flask", "run", "--host=0.0.0.0", "--port=80"]
-```
-
-The Dockerfile:
-1. Uses a Python 3 base image
-2. Installs the required dependencies (Flask and Werkzeug)
-3. Copies the application code to the container
-4. Exposes port 80 for web traffic
-5. Sets up the entrypoint to run the Flask application
-
-### Flask Application Architecture
-
-The Flask application (`flask_app/app.py`) serves as the main entry point and has two primary routes:
+The main entry point for the challenge is a Flask application that serves two primary routes:
 
 ```python
 import subprocess
@@ -108,14 +62,24 @@ if __name__ == "__main__":
     app.run(host="0.0.0.0", port=80)
 ```
 
-Key components:
-1. `/` route - Serves the main index page and triggers flag generation
-2. `/security.txt` route - Serves the hidden file containing the flag parts
-3. The Flask application runs on port 80 inside the container
+#### Key Features:
 
-### Flag Generation Process
+1. **Root Endpoint (`/`)**
+   - Triggers the flag generation script
+   - Renders the main index page (financial dashboard)
+   - Acts as a distraction with no hints about the hidden file
 
-The heart of the challenge is the `create_json.py` script, which generates a unique flag and embeds it in product IDs:
+2. **Hidden Endpoint (`/security.txt`)**
+   - Serves the hidden file containing flag parts
+   - Finding this endpoint is a key part of the challenge
+   - Requires web enumeration tools to discover
+
+### Component 2: Flag Generator (`create_json.py`)
+
+This script is responsible for:
+- Generating a unique flag based on a challenge key and team-specific key
+- Splitting the flag into parts
+- Embedding flag parts in product IDs in a JSON file
 
 ```python
 import hashlib
@@ -180,151 +144,125 @@ with open(output_path, "w") as json_file:
 logger.info("JSON file successfully created at %s", output_path)
 ```
 
-Key flag generation steps:
-1. Load product data from products.json
-2. Combine the challenge key and team key to create a unique identifier
-3. Generate a SHA-256 hash of the combined key, prefixed with `FF{...}`
-4. Split the hash into 9 parts
-5. Assign each part to a product as its ID
-6. Save the modified product data to security.txt in the hidden directory
+#### Key Algorithms:
 
-### Web Interface
+1. **Flag Generation**
+   - Combines a fixed challenge string (`#74q$j&zcB`) with a team-specific key
+   - Applies SHA-256 hashing to create a unique flag
+   - Formats it with the `FF{...}` prefix
 
-The web interface is a simple cryptocurrency financial dashboard created with HTML, Tailwind CSS, and TradingView widgets:
+2. **Flag Splitting**
+   - Divides the flag into 9 equal parts
+   - Each part will be assigned to a different product
 
-```html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Get Rich</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <script src="https://s3.tradingview.com/tv.js"></script>
-    <!-- Additional styling -->
-</head>
-<body class="bg-solana-dark text-white">
-    <!-- Header and main content -->
-    <main class="container mx-auto p-4">
-        <!-- Financial dashboard content -->
-        <!-- Market overview section with TradingView charts -->
-        <!-- Portfolio performance section -->
-    </main>
-    <footer class="bg-gray-800 p-4 text-center rounded-lg mt-4 w-full fixed bottom-0">
-        <p class="text-gray-500">&copy; 2024 Financial Dashboard. All rights reserved.</p>
-    </footer>
-    <!-- TradingView widget initialization scripts -->
-</body>
-</html>
+3. **JSON Modification**
+   - Assigns each flag part as the ID of a product
+   - Saves the modified product data to security.txt in the hidden directory
+
+### Component 3: Web Interface
+
+The web interface is a simple cryptocurrency financial dashboard created with HTML, Tailwind CSS, and TradingView widgets.
+
+#### Key Design Elements:
+- Designed as a distraction with no direct hints to the hidden file
+- Includes cryptocurrency charts and financial information
+- Professionally styled with Tailwind CSS
+
+### Component 4: Containerization
+
+The application is containerized using Docker for easy deployment and isolation.
+
+#### Dockerfile (`flask_app/Dockerfile`):
+
+```dockerfile
+FROM python:3
+
+# Copy and install requirements
+COPY flask_app/requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code and set working directory
+COPY . code
+WORKDIR /code
+
+EXPOSE 80
+
+# Run the Flask application
+ENTRYPOINT ["python", "flask_app/app.py"]
+CMD ["flask", "run", "--host=0.0.0.0", "--port=80"]
 ```
 
-The web interface serves as a distraction, containing no direct hints to the existence of the hidden file.
+#### Docker Compose (`docker-compose.yml`):
 
-### Installation (For Local Testing)
+```yaml
+version: '3'
 
-**Linux**
+volumes:
+  my-django-data:
 
-- [Docker Linux installation](https://docs.docker.com/engine/install/ubuntu/)
-- [Docker-compose Linux installation](https://docs.docker.com/compose/install/linux/)
+services:
+  flask:
+    build:
+      context: .
+      dockerfile: flask_app/Dockerfile
 
-**Windows**
+    ports:
+      - '80:80'
 
-- [Docker Windows installation](https://docs.docker.com/desktop/setup/install/windows-install/)
-- [Docker-compose Windows installation](https://docs.docker.com/compose/install/)
+    environment:
+      - TEAMKEY=XXXXXXX  # This value is replaced with a unique team key in the actual challenge
+```
 
-After installing Docker and Docker Compose, follow these steps:
+#### Container Design:
 
-1. Clone the repository:
-   ```
-   git clone https://github.com/CTF-FlagFrenzy/challenges.git
-   ```
+1. **Base Image**
+   - Uses Python 3 as the foundation
+   - Provides a consistent runtime environment
 
-2. Navigate to the File_And_Seek challenge directory:
-   ```
-   cd challenges/File_And_Seek
-   ```
+2. **Dependencies**
+   - Installs required packages from requirements.txt
+   - Primarily Flask and Werkzeug
 
-3. Start the challenge:
-   ```
-   docker-compose up
-   ```
+3. **Networking**
+   - Exposes port 80 for web traffic
 
-4. Verify the container is running:
-   ```
-   docker ps
-   ```
-
-The challenge will be accessible at http://localhost:80.
-
-**HAVE FUN**
+4. **Environment Variables**
+   - TEAMKEY: Team-specific key used in flag generation
+   - Can be customized for each deployment
 
 ## Challenge Writeup
 
-### Steps to Solve
+### Step 1: Web Enumeration
+The first step is to use web enumeration tools to discover hidden endpoints. Using a tool like ffuf:
 
-1. **Use the FUZZ tool on Linux**:
-
-```sh
-ffuf -w common.txt -u http://172.20.18.53:8003/FUZZ > output.txt
- /'___\  /'___\           /'___\                           
-/\ \__/ /\ \__/  __  __  /\ \__/    
-\ \ ,__\\ \ ,__\/\ \/\ \ \ \ ,__\   
- \ \ \_/ \ \ \_/\ \ \_\ \ \ \ \_/ 
-  \ \_\   \ \_\  \ \____/  \ \_\   
-   \/_/    \/_/   \/___/    \/_/      
-                                                           
-       v2.1.0-dev
-________________________________________________
-
- :: Method           : GET
- :: URL              : http://172.20.18.53:8003/FUZZ
- :: Wordlist         : FUZZ: /home/kali/Documents/wordlists/common.txt
- :: Follow redirects : false
- :: Calibration      : false
- :: Timeout          : 10
- :: Threads          : 40
- :: Matcher          : Response status: 200-299,301,302,307,401,403,405,500
-________________________________________________
+```bash
+ffuf -w common.txt -u http://[challenge-ip]:[port]/FUZZ > output.txt
 ```
 
-2. **Checking the output.txt file**
+### Step 2: Identify the Hidden File
+Analyzing the output reveals a hidden endpoint: `/security.txt`
 
-You can see that the scan found something `security.txt`
+### Step 3: Access the Hidden File
+Visit the discovered URL: `http://[challenge-ip]:[port]/security.txt`
 
-3. **Use the information and get to the txt file**
+### Step 4: Extract the Flag Parts
+The security.txt file contains JSON data with cryptocurrency products. Each product has an ID field containing a part of the flag.
 
-`http://172.20.18.53:8003/security.txt`
+### Step 5: Assemble the Flag
+Collect all the product IDs in order and concatenate them to form the complete flag in the format `FF{...}`.
 
-Now you can see a json like formatted text. Checking the ids you can se the flag format FF{}, maybe someone divided the flag in multiple parts... Take the parts and stick them together.
-```json
-{
-            "id": "FF{082f",
-            "name": "Bitcoin Paper Wallet (pack of 20)",
-            "description": "Securely store your Bitcoin with these paper wallets.",
-            "picture": "/static/img/products/bitcoin_paper_wallet.png",
-            "priceUsd": {
-                "currencyCode": "USD",
-                "units": 50
-            },
-            "categories": [
-                "crypto",
-                "security"
-            ]
-        },
+### Step 6: Submit the Flag
+Submit the assembled flag to complete the challenge.
 
-{
-            "id": "b010771",
-            "name": "Ethereum Hardware Wallet",
-            "description": "Keep your Ethereum safe with this hardware wallet.",
-            "picture": "/static/img/products/ethereum_hardware_wallet.png",
-            "priceUsd": {
-                "currencyCode": "USD",
-                "units": 100
-            },
-            "categories": [
-                "crypto",
-                "security"
-            ]
-        },
-```
+### Key Insights
+1. The challenge tests web enumeration skills to find hidden endpoints
+2. Understanding how to extract and reassemble parts of a fragmented flag is essential
+3. The financial dashboard serves as a distraction with no useful information for solving the challenge
+
+### Tools Used
+- Web enumeration tool (e.g., ffuf, dirb, gobuster)
+- Web browser to view the hidden file
+- JSON parsing knowledge to extract flag parts
+
+
 
