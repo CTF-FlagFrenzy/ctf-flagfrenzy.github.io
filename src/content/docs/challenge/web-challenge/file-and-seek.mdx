@@ -5,6 +5,27 @@ description: File And Seek challenge
 
 In this challenge, participants need to find a hidden file within a web application. The hidden file contains information about various cryptocurrency products, and each product's ID section contains a part of the flag. The challenge involves using web enumeration tools to locate the hidden file and then extracting and assembling the flag from the product IDs.
 
+#### Directory Structure
+
+```
+docker-compose.yml
+File_And_Seek.md
+test_File_And_Seek.md
+writeup.md
+flask_app/
+    __init__.py
+    app.py
+    create_json.py
+    Dockerfile
+    products.json
+    requirements.txt
+    hidden/
+        .gitkeep
+    templates/
+        index.html
+media/
+```
+
 ### Docker Compose Configuration
 
 The `docker-compose.yml` file sets up the environment for the challenge by building and running the Flask application:
@@ -29,6 +50,8 @@ services:
 ```
 
 The TEAMKEY environment variable provides a unique value that is combined with the challenge key to generate a unique flag for each team.
+
+
 
 ### Dockerfile Implementation
 
@@ -198,9 +221,6 @@ The web interface is a simple cryptocurrency financial dashboard created with HT
 The web interface serves as a distraction, containing no direct hints to the existence of the hidden file.
 
 ### Installation (For Local Testing)
-
-> [!NOTE]
-> Make sure to install docker and docker-compose first
 
 **Linux**
 

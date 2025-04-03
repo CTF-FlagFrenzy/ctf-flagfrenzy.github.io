@@ -12,7 +12,7 @@ This repository contains the CTF-Flagfreny website built with Astro and hosted o
 ### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/ctf-flagfreny/ctf-flagfreny.github.io.git
+git clone https://github.com/CTF-FlagFrenzy/ctf-flagfrenzy.github.io.git
 cd ctf-flagfreny.github.io
 ```
 
