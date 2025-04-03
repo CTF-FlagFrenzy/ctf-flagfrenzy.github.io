@@ -15,21 +15,17 @@ The CTF FlagFrenzy backend provides the API Endpoints that power the platform.
 
 ## Core Services
 
-- **Authentication**: Manages user identity and access control
 - **Database**: Database Design
 - **Challenge Endpoints**: Handles challenge creation, updates, deletion, infos, and hints 
 - **Team Endpoints**: Manages team creation, updates, deletion, member coordination, and infos
 - **User Endpoints**: Manages user creation, updates, deletion, and infos
 - **Endpoints for the Cluster**: Manages challenges deploying and deprovisioning
 
-## Authentication 
-The Authentication is made with Azure. For this purpose, a separate app was created in Azure and Svelte contacts this and registers the user with Azure.
-![alt text](../../../../assets/backend/Azure.png)
 
 ## Database
 The Database saves all necessary information to run the CTF. 
 
-In the following figure you can see the ER-Diagram of the Database.
+In the following figure you can see the ER-Diagram of the Database. For persistence it exists a volume for the database.
 ![alt text](../../../../assets/backend/ER-Diagram.png)
 
 | Table Name | Foreign Key | Description |
