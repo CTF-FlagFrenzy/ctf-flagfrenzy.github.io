@@ -5,7 +5,7 @@ description: Overview of all CTF challenges
 
 This section contains all the challenges available in the CTF FlagFrenzy platform.
 
-### Challenge Categories
+## Challenge Categories
 
 - Web Challenges
 - Others
@@ -97,3 +97,31 @@ Here are the Blockchain challenges:
 | Challenge              | Difficulty | Flags | Status    | Authors                | Solves |
 | :--------------------- | :--------- | :---- | :-------- | :--------------------- | :----- |
 | Solana_Dumb_Contract | Expert     | 1     | 100% done | [zVSciy](https://github.com/zVSciy) | 2      |
+
+## Installation (For Local Testing)
+
+**Linux**
+
+- [Docker Linux installation](https://docs.docker.com/engine/install/ubuntu/)
+- [Docker-compose Linux installation](https://docs.docker.com/compose/install/linux/)
+
+**Windows**
+
+- [Docker Windows installation](https://docs.docker.com/desktop/setup/install/windows-install/)
+- [Docker-compose Windows installation](https://docs.docker.com/compose/install/)
+
+After installing Docker and Docker Compose, you need to clone the repository:
+
+```
+git clone https://github.com/CTF-FlagFrenzy/challenges.git
+```
+
+Then navigate to the root of the challenge you want to run:
+
+```
+docker-compose up
+```
+
+You can view running containers with `docker ps`.
+
+**HAVE FUN**

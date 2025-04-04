@@ -3,7 +3,7 @@ title: "CTF Web-Challenge/Reversing | Hidden Job : Medium Level"
 description: Hidden Job challenge
 ---
 
-The HiddenJob challenge combines competences of physical awareness, web as well as reverse engineering. The introduction is given by a flyer that must be found before the (real) fun begins. There is also game that can be played in the course of this challenge as well.
+HiddenJob is a Capture The Flag (CTF) challenge designed to test participants' ability to combine physical awareness, web exploitation, and reverse engineering. The challenge involves a web server hosting a Flask application, a downloadable game, and hidden information spread across different locations.
 
 #### Directory Structure
 
@@ -14,66 +14,44 @@ Hidden_Job/
 ├── test_Hidden_Job.md
 ├── writeup.md
 ├── flask_app/
-│   ├── app.py
-│   ├── create_txt.py
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   ├── download/
-│   │   ├── .gitkeep
-│   │   └── ProjectDelta.zip
-│   ├── hidden/
-│   │   └── .gitkeep
-│   └── templates/
-│       └── index.html
+│ ├── app.py
+│ ├── create_txt.py
+│ ├── Dockerfile
+│ ├── requirements.txt
+│ ├── download/
+│ │ ├── .gitkeep
+│ │ └── ProjectDelta.zip
+│ ├── hidden/
+│ │ └── .gitkeep
+│ └── templates/
+│ └── index.html
 ├── media/
-│   ├── image.png
-│   └── image2.png
-└── src/       
+│ ├── image.png
+│ └── image2.png
+└── src/
 ```
+## Technical Implementation
 
-### Docker Compose
-Starting off with the `docker-compose` file, this file starts the challenge container needed for the CTF.
+### Architecture
 
-```yml
-version: '3'
+The challenge uses a web application architecture built with the following components:
 
-volumes:
-  my-django-data:
+1.  **Flask Application** (`flask_app/app.py`): Serves the web interface and handles user interactions.
+2.  **TXT File Creator** (`flask_app/create_txt.py`): Generates a hidden `robots.txt` file with game-related dialogue and a flag.
+3.  **Docker Configuration** (`docker-compose.yml`, `flask_app/Dockerfile`): Containerizes the application for easy deployment.
 
-services:
-  flask:
-    build:
-      context: .
-      dockerfile: flask_app/Dockerfile
+### Component 1: Flask Application (`flask_app/app.py`)
 
-    ports:
-      - '8010:5000'
+The Flask application handles user logins, serves the main page, and provides a download link for the "ProjectDelta" game. It also dynamically generates a flag based on environment variables.
 
-    environment:
-      - TEAMKEY=XXXXXXX
-      - TEAM_ID=XXXXXXX
-```
+#### Key Features:
+- **Login Functionality**: Implements a login system with hardcoded credentials (Admin/N3tzw3rkTechNik)
+- **Flag Generation**: Generates a dynamic flag using environment variables and SHA256 hashing
+- **File Serving**: Serves the "ProjectDelta" game download and a hidden robots.txt file
+- **Session Management**: Uses Flask sessions to manage user login status
 
-### Dockerfile
-The Dockerfile sets up the Flask application environment.
-
-```yml
-FROM python:3
-
-COPY flask_app/requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . code
-WORKDIR /code
-
-ENTRYPOINT ["python", "flask_app/app.py"]
-CMD ["flask", "run", "--host=0.0.0.0", "--port=5000"]
-```
-
-### Flask Application
-The Flask application is defined in `flask_app/app.py`. It serves the main page and the hidden file.
-
-```py
+#### Imports and Setup:
+```python
 import os
 import hashlib
 import logging
@@ -90,7 +68,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 combined_flag = ""
+```
 
+#### Main Route and Flag Generation:
+```python
 @app.route('/')
 def index():
     client_ip = request.remote_addr
@@ -106,7 +87,10 @@ def index():
         logger.error("Failed to create flag. Ensure TEAMKEY and CHALLENGEKEY are set in environment variables.")
         hashed_flag = "FLAG_NOT_DEFINED"
     return render_template("index.html", logged_in=session.get('logged_in'), hashed_flag=hashed_flag)
+```
 
+#### Authentication Routes:
+```python
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -123,26 +107,28 @@ def login():
 def logout():
     session.pop('logged_in', None)
     return redirect(url_for('index'))
+```
 
+#### File Download and Hidden Routes:
+```python
 @app.route('/download/ProjectDelta.exe')
 def download_project_delta():
     return send_from_directory(os.path.join(app.root_path, "download"), "ProjectDelta.exe")
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
 
 @app.route('/<combined_flag>/robots.txt')
 def hidden_file(combined_flag):
     return send_from_directory(os.path.join(app.root_path, "hidden"), "robots.txt")
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=80)
 ```
 
-### TXT File Creation
-The `create_txt.py` script generates a txt file with a dialogue and saves it to a "hidden" directory.
+### Component 2: TXT File Creator (`flask_app/create_txt.py`)
 
-```py
+This script generates a robots.txt file in the "hidden" directory, containing a dialogue and a second dynamic flag.
+
+#### Imports and Logging Setup:
+```python
 import os
 import hashlib
 import logging
@@ -153,7 +139,10 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger(__name__)
+```
 
+#### File Creation Function:
+```python
 def create_robots_txt():
     challengeflag_2 = os.environ.get("CHALLENGEKEY_2")
     teamflag = os.environ.get("TEAMKEY")
@@ -169,19 +158,14 @@ def create_robots_txt():
         
         robots_txt_path = os.path.join(base_hidden_folder, "robots.txt")
         with open(robots_txt_path, "w") as file:
-            file.write(f"\nSophie: Hey Fabio, have you played Project Delta yet? The one everyone’s talking about? You can download it here : {download_link}\n")
-            file.write("Fabio: Ohh, yeah! The one with the open world and those alien ruins, right?\n")
-            file.write("Sophie: Yup, that’s the one! I started yesterday, and I totally messed up on the first mission. I thought it was still the tutorial and wasted all my resources.\n")
-            file.write("Fabio: Hahaha, classic Sophie. But no joke, I didn’t realize how important the energy cores were until I accidentally sold two of them.\n")
-            file.write("Sophie: Oof, that hurts. Have you fought that boss in the Twilight Gorge yet?\n")
-            file.write("Fabio: Oh my god, yes! The one with the three phases? That guy absolutely destroyed me.\n")
-            file.write("Sophie: Right?! I was so proud when I cleared the first phase, and then BAM – he pulls out those laser drones.\n")
+            file.write(f"\nSophie: Hey Fabio, have you played Project Delta yet? The one everyone's talking about? You can download it here : {download_link}\n")
+            # Dialogue continues with game discussion between Sophie and Fabio
             file.write("Fabio: Ugh, those things are so unfair. I burned through like five revival kits just to survive.\n")
-            file.write("Sophie: Same. If I hadn’t gotten the jetpack upgrade, I wouldn’t have stood a chance. It saved my life.\n")
+            file.write("Sophie: Same. If I hadn't gotten the jetpack upgrade, I wouldn't have stood a chance. It saved my life.\n")
             file.write("Fabio: Jetpack upgrade?! Where did you get that?!\n")
             file.write(f"Sophie: Haha, You need to enter this {hashed_flag_2}.\n")
-            file.write("Fabio: Ugh, you’re the best.\n")
-            file.write("Sophie: Trust me, it’s worth it. But just wait – the next boss is ten times harder.\n")
+            file.write("Fabio: Ugh, you're the best.\n")
+            file.write("Sophie: Trust me, it's worth it. But just wait – the next boss is ten times harder.\n")
             file.write("Fabio: Stop trying to scare me! I need a break after all this stress.\n")
         
         logger.info("robots.txt file created at %s", robots_txt_path)
@@ -194,83 +178,87 @@ if __name__ == "__main__":
     create_robots_txt()
 ```
 
-### HTML Template
-The HTML template for the main page is located in `flask_app/templates/index.html`.
+### Component 3: Containerization
 
-## Technical Guideline
+The Docker files facilitate the deployment of the Flask application.
 
-### Installation
+#### Docker Compose (`docker-compose.yml`):
+```yml
+version: '3'
 
-> [!NOTE]
-> Make sure to install docker and docker-compose first
+volumes:
+    my-django-data:
 
-**Linux**
+services:
+    flask:
+        build:
+            context: .
+            dockerfile: flask_app/Dockerfile
 
-- [Docker Linux installation](https://docs.docker.com/engine/install/ubuntu/)
+        ports:
+            - '80:80'
 
-- [Docker-compose Linux installation](https://docs.docker.com/compose/install/linux/)
-
-**Windows**
-
-- [Docker Windows installation](https://docs.docker.com/desktop/setup/install/windows-install/)
-
-- [Docker-compose Windows installation](https://docs.docker.com/compose/install/)
-
-After you installed docker and docker-compose you need to pull the repository via cli using this command.
-
-```
-git pull https://github.com/CTF-FlagFrenzy/challenges.git
+        environment:
+            - TEAMKEY=XXXXXXX
+            - TEAM_ID=XXXXXXX
 ```
 
-Then you navigate to the root of the `Hidden_Job` challenge and type the following command in the cli.
+#### Dockerfile (`flask_app/Dockerfile`):
+```dockerfile
+FROM python:3
 
-```
-docker-compose up
+COPY flask_app/requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . code
+WORKDIR /code
+
+ENTRYPOINT ["python", "flask_app/app.py"]
+CMD ["flask", "run", "--host=0.0.0.0", "--port=80]
 ```
 
-You can see all running container with `docker ps`.
+#### Container Design:
+
+1. **Base Image**
+   - Uses Python 3 as the foundation
+   - Provides a consistent runtime environment
+
+2. **Dependencies**
+   - Installs required packages from requirements.txt:
+     - Flask 2.0.2
+     - Werkzeug 2.0.3
+
+3. **File Structure**
+   - Copies the application code to `/code` in the container
+   - Sets `/code` as the working directory
+
+4. **Networking**
+   - Exposes port 80 for web traffic
+
+5. **Environment Variables**
+   - TEAMKEY: Team-specific key used in flag generation
+   - Can be customized for each deployment
 
 **HAVE FUN**
 
 ## Challenge Writeup
 
-### Steps to solve
-1. **Find and analyse the HiddenJob flyer**:
-    - The first step was to find the HiddenJob flyer which was placed on the well-known flyer board near the canteen.
-    - This also leads to the first flag (static): ``FF{N0oN3Kn0W2!}``
+### Step 1: Find and Analyze the HiddenJob Flyer
+- The first step involves locating the HiddenJob flyer, which reveals the first static flag: `FF{N0oN3Kn0W2!}`.
+- The flyer also contains login credentials for the web application: 
+  - Username: `Admin`
+  - Password: `N3tzw3rkTechNik`
 
-    ![Picture could not be loaded](../../../../assets/others/hidden-job/image.png)
+### Step 2: Login
+- Use the credentials from Step 1 to log in to the web application.
 
-2. **Credentials Hunter**:
-    - On the mentioned flyer, credentials for the next steps can be found as well.
+### Step 3: Find the Second Flag
+- After logging in, a dynamic flag is generated and displayed on the website.
 
-    `Username: Admin`
-    `Password: N3tzw3rkTechNik`
+### Step 4: Find robots.txt
+- Use the dynamic flag from Step 3 as a part of the URL to access the hidden robots.txt file: `<flag>/robots.txt`.
+- The robots.txt file contains a dialogue and a second dynamic flag.
 
-    ![Picture could not be loaded](../../../../assets/others/hidden-job/image2.png)
-
-3. **Login**:
-    - Use the credentials from step 2 to login on the HiddenJob website.
-
-4. **Find the second flag**:
-    - After the login, open one of the recent jobs again.
-    - You will gather the second flag (dynamic) through this step.
-
-5. **Find robots.txt**:
-    - Using the hints from the website, it is clear that the flag from step 4 must be reused for the robots.txt URL.
-    - The URL is `<flag>/robots.txt`
-    - There is also a hint for the last flag.
-
-6. **Play ProjectDelta**:
-    - The last flag may be obtained by playing ProjectDelta - download it from `/download/ProjectDelta.zip`.
-    - The final boss of the game must be killed in order to get the last flag.
-    - Go to the bottom right-hand edge of the map and cross the bridge there. Then continue to the right until you pass the 2nd house there should be a path leading down. This path will take you to the final boss via an invisible teleporter. Happy killing!
-    - Static flag: `FF{Proj3ctD3ltA!sTh3B4st@ame!}` 
-
-
-### Tools Used
-- Webtools
-- URL Hopping
-
-### Conclusion
-HiddenJob was a good introduction to recognising that it is worth analysing existing things more closely. In addition, basic URL hopping could be carried out and a short break could be taken for gaming.
+### Step 5: Play ProjectDelta
+- Download and play the "ProjectDelta" game from `/download/ProjectDelta.zip`.
+- Defeat the final boss to obtain the last static flag: `FF{Proj3ctD3ltA!sTh3B4st@ame!}`

@@ -3,7 +3,7 @@ title: "CTF Web-Challenge | Shadow_File: Hard"
 description: Shadow File challenge
 ---
 
-In this challenge, participants must find a hidden file within a web application. The hidden file contains information about various cryptocurrency products, and each product's ID section holds a part of the flag. These flag parts are hex-encoded and shuffled, and the "units" field in each product contains the information needed to arrange the parts in the correct order. The challenge involves web reconnaissance techniques to locate the hidden file and cryptographic knowledge to decode and reassemble the flag.
+Shadow File is a Capture The Flag (CTF) challenge designed to test participants' web reconnaissance skills and cryptographic knowledge. The challenge involves finding a hidden file within a web application that contains cryptocurrency product information. Each product's ID field holds a hex-encoded part of the flag, and the "units" field provides the sequence information needed to correctly arrange these parts.
 
 #### Directory Structure
 
@@ -26,59 +26,23 @@ flask_app/
 media/
 ```
 
-### Docker Compose
+## Technical Implementation
 
-The `docker-compose.yml` file sets up the environment for the challenge by starting the Flask service on port 80:
+### Architecture
+The challenge uses a microservice architecture built with the following components:
 
-```yaml
-version: '3'
+1. **Web Server** (`app.py`): A Flask application that serves the main page and the hidden file.
+2. **Flag Generator** (`create_json.py`): A Python script that generates and hides the encoded flag parts.
+3. **Containerization** (`Dockerfile` and `docker-compose.yml`): Configuration for deployment and isolation.
 
-volumes:
-  my-django-data:
+### Component 1: Web Server (`app.py`)
 
-services:
-  flask:
-    build:
-      context: .
-      dockerfile: flask_app/Dockerfile
+This is the main entry point for the challenge. It's a Flask web application that:
+- Serves the main index page as a decoy cryptocurrency dashboard
+- Provides a hidden endpoint for the security.txt file
+- Triggers the flag generation script when requested
 
-    ports:
-      - '80:80'
-
-    environment:
-      - TEAMKEY=XXXXXXX
-```
-
-### Dockerfile
-
-The Dockerfile sets up the Flask application environment:
-
-```dockerfile
-FROM python:3
-
-COPY flask_app/requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . code
-WORKDIR /code
-EXPOSE 80
-
-ENTRYPOINT ["python", "flask_app/app.py"]
-CMD ["flask", "run", "--host=0.0.0.0", "--port=80"]
-```
-
-### Requirements
-
-The application depends on Flask and Werkzeug:
-
-```
-Flask==2.0.2
-Werkzeug==2.0.3
-```
-
-### Flask Application
-
-The Flask application is defined in `flask_app/app.py`. It serves the main page and the hidden file:
+#### Full Source Code:
 
 ```python
 import subprocess
@@ -105,32 +69,16 @@ if __name__ == "__main__":
     app.run(host="0.0.0.0", port=80)
 ```
 
-### Product Data
+### Component 2: Flag Generator (`create_json.py`)
 
-The application uses a JSON file with product information as a base:
+This script is responsible for:
+- Generating a unique flag based on a fixed challenge string and team-specific key
+- Splitting the flag into multiple parts
+- Encoding each part as hexadecimal
+- Shuffling the encoded parts and embedding them in product data
+- Storing the original position in the "units" field for later reassembly
 
-```json
-{
-    "products": [
-        {
-            "id": "535551674e444935",
-            "name": "Bitcoin Paper Wallet (pack of 20)",
-            "description": "Securely store your Bitcoin with these paper wallets.",
-            "picture": "/static/img/products/bitcoin_paper_wallet.png",
-            "priceUsd": {
-                "currencyCode": "USD",
-                "units": 50
-            },
-            "categories": ["crypto", "security"]
-        },
-        // ...more products...
-    ]
-}
-```
-
-### Flag Generation Script
-
-The `create_json.py` script is responsible for generating the challenge flag and hiding it within the product data:
+#### Full Source Code:
 
 ```python
 import hashlib
@@ -207,74 +155,92 @@ with open(output_path, "w") as json_file:
 logger.info("JSON file successfully created at %s", output_path)
 ```
 
-The script performs the following key operations:
+#### Key Algorithms:
 
-1. **Reads the product data**: Loads the base product information from products.json
-2. **Creates the flag**: Combines the challenge key with the team key and creates a SHA-256 hash
-3. **Splits the flag**: Divides the flag into 9 parts of equal length
-4. **Encodes and shuffles**: Converts each part to hexadecimal and randomly shuffles them
-5. **Embeds the flag parts**: Assigns each encoded part to a product's ID and stores its original position in the units field
-6. **Saves the modified data**: Writes the JSON data to the hidden file location
+1. **Flag Generation**
+   - Combines a fixed challenge string (`t9gE6@W!Nz`) with a team-specific key
+   - Applies SHA-256 hashing to create a unique flag
+   - Formats it with the `FF{...}` prefix
 
-### Frontend Implementation
+2. **Flag Segmentation and Encoding**
+   - Divides the flag into 9 equal parts
+   - Converts each part to hexadecimal format
+   - Shuffles the parts to obscure the sequence
 
-The HTML template (`index.html`) creates a financial dashboard as a decoy, showing cryptocurrency charts to maintain the theme while hiding the actual challenge:
+3. **Data Embedding**
+   - Assigns each encoded part to a product's ID field
+   - Stores the original position in the product's "units" field
+   - Creates a JSON file with the modified data
 
-```html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Get Rich</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <script src="https://s3.tradingview.com/tv.js"></script>
-    <style>
-        .bg-solana-dark { background-color: #131722; }
-        .text-solana { color: #00FFA3; }
-        .hover\:text-solana:hover { color: #00FFA3; }
-    </style>
-</head>
-<body class="bg-solana-dark text-white">
-    <!-- Frontend for financial dashboard -->
-    <!-- Contains charts from TradingView -->
-</body>
-</html>
+### Component 3: Containerization
+
+The application is containerized using Docker for easy deployment and isolation.
+
+#### Dockerfile (`flask_app/Dockerfile`):
+
+```dockerfile
+FROM python:3
+
+COPY flask_app/requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . code
+WORKDIR /code
+EXPOSE 80
+
+ENTRYPOINT ["python", "flask_app/app.py"]
+CMD ["flask", "run", "--host=0.0.0.0", "--port=80"]
 ```
 
-### Installation (For Local Testing)
+#### Docker Compose (`docker-compose.yml`):
 
-**Linux**
+```yaml
+version: '3'
 
-- [Docker Linux installation](https://docs.docker.com/engine/install/ubuntu/)
-- [Docker-compose Linux installation](https://docs.docker.com/compose/install/linux/)
+volumes:
+  my-django-data:
 
-**Windows**
+services:
+  flask:
+    build:
+      context: .
+      dockerfile: flask_app/Dockerfile
 
-- [Docker Windows installation](https://docs.docker.com/desktop/setup/install/windows-install/)
-- [Docker-compose Windows installation](https://docs.docker.com/compose/install/)
+    ports:
+      - '80:80'
 
-After installing Docker and Docker Compose, you need to clone the repository:
-
-```
-git clone https://github.com/CTF-FlagFrenzy/challenges.git
-```
-
-Then navigate to the root of the `Shadow_File` challenge and run:
-
-```
-docker-compose up
+    environment:
+      - TEAMKEY=XXXXXXX
 ```
 
-You can view running containers with `docker ps`.
+#### Container Design:
+
+1. **Base Image**
+   - Uses Python 3 as the foundation
+   - Provides a consistent runtime environment
+
+2. **Dependencies**
+   - Installs required packages from requirements.txt:
+     - Flask 2.0.2
+     - Werkzeug 2.0.3
+
+3. **File Structure**
+   - Copies the application code to `/code` in the container
+   - Sets `/code` as the working directory
+
+4. **Networking**
+   - Exposes port 80 for web traffic
+
+5. **Environment Variables**
+   - TEAMKEY: Team-specific key used in flag generation
+   - Can be customized for each deployment
 
 **HAVE FUN**
 
 ## Challenge Writeup
 
-### Steps to Solve
-
-1. **Use the FUZZ tool on Linux**:
+### Step 1: Discover the Hidden File
+Use a web directory scanning tool to find hidden endpoints:
 
 ```sh
 ffuf -w common.txt -u http://172.20.18.53:8003/FUZZ > output.txt
@@ -299,56 +265,28 @@ ________________________________________________
 ________________________________________________
 ```
 
-2. **Checking the output.txt file**
+### Step 2: Analyze the Scan Results
+Check the output.txt file to discover the hidden `security.txt` endpoint.
 
-You can see that the scan found something `security.txt`
+### Step 3: Access the Hidden File
+Navigate to `http://172.20.18.53:8003/security.txt` to retrieve the JSON data.
 
-3. **Use the information and get to the txt file**
+### Step 4: Decode the Flag Parts
+Each product ID contains a hex-encoded part of the flag. Decode each ID using a tool like CyberChef with "From Hex" operation.
 
-`http://172.20.18.53:8003/security.txt`
+### Step 5: Reconstruct the Flag
+Use the "units" field from each product to determine the correct order of the decoded flag parts. Assemble the parts in this order to form the complete flag.
 
-Now you can see a JSON-formatted text. By checking the IDs, you might notice a letter in the second one. Could it be hex-encoded text? Let’s decode it and find out.
-```json
-   {
-            "id": "36373331336333373639627d",
-            "name": "Blockchain T-Shirt",
-            "description": "Show your love for blockchain technology with this stylish t-shirt.",
-            "picture": "/static/img/products/blockchain_tshirt.png",
-            "priceUsd": {
-                "currencyCode": "USD",
-                "units": 8
-            },
-            "categories": [
-                "crypto",
-                "apparel"
-            ]
-        },
-        {
-            "id": "65316430316362",
-            "name": "Crypto Miner Air Freshener",
-            "description": "Keep your mining rig smelling fresh with this air freshener.",
-            "picture": "/static/img/products/crypto_miner_air_freshener.png",
-            "priceUsd": {
-                "currencyCode": "USD",
-                "units": 6
-            },
-            "categories": [
-                "crypto",
-                "accessories"
-            ]
-        },
-```
-4. **Using [Cyberchef](https://cyberchef.io/) you can get new informations**
-- **Settings:** From Hex with `None` as delimiter
+### Step 6: Submit the Flag
+The complete flag should be in the format `FF{...}`, which you can submit to complete the challenge.
 
+### Key Insights
+1. The challenge requires finding a hidden file through web reconnaissance
+2. The flag is split into parts, hex-encoded, and shuffled among product IDs
+3. The "units" field contains the key to reconstructing the flag in the correct order
 
-- Input: `32313738303139383932347d`
-
-- Output: `21780198924}`
-
-Checking the output you see the `{`
-
-By repeating the same process for all other IDs, you can decode all parts of the flag. To assemble the flag in the correct order, take a close look at the "units" field of each product. This field provides the sequence in which the decoded parts need to be arranged to form the correct flag.
-
-`FF{5b6ffc6b2fa2e4a92d5d3ca65116f5fbbb02b5fe1d01cbb5df89967313c3769b}`
+### Tools Used
+- FFUF for web directory scanning
+- CyberChef for hex decoding
+- Basic knowledge of JSON structure analysis
 
