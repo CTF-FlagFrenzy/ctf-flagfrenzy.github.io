@@ -25,7 +25,7 @@ The CTF FlagFrenzy backend provides the API Endpoints that power the platform.
 ## Database
 The Database saves all necessary information to run the CTF. 
 
-In the following figure you can see the ER-Diagram of the Database. For persistence it exists a volume for the database.
+In the following figure you can see the ER-Diagram of the Database. For persistence it exists a volume for the database. To import the Challenges use the challenges.json file in the DB folder.
 ![alt text](../../../../assets/backend/ER-Diagram.png)
 
 | Table Name | Foreign Key | Description |
@@ -100,3 +100,18 @@ These Endpoints are very important to communicate with the cluster. It sends the
 |----------|--------|-------------|----------|
 | `/deploy/{user_id}/{challenge_id}` | GET | Retrieve the Kubernetes output and create a pod in the cluster. | `Stdout: "Url//https://containerUrl.at"` |
 | `/deprovision/{user_id}/{challenge_id}` | POST | Deprovision a specific pod and delete the entry in the user-made-challenge table. | `{ "detail": "Deprovisioning successful" }` |
+
+## Folder Tree
+Here you can see the folder tree of the API. The database connection is established in the database.py file and the creation of the tables is defined in the model.py. The whole Fastapi is in the main.py.
+```tree
+│   DockerFile
+│   requirements.txt
+└───src
+    │   main.py
+    │   script.py
+    │
+    ├───model
+    │   │   database.py
+    │   │   models.py
+    │   │   __init__.py
+```
