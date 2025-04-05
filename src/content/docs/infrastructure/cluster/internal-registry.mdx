@@ -4,3 +4,118 @@ description: Internal Registry of the CTF FlagFrenzy Cluster
 ---
 
 Some Text
+
+## 🧠 Context and Reasoning
+
+For K3s agent nodes to pull container images from the private Docker registry set up earlier (`registry/setup.mdx`), they need to be configured to:
+
+1.  **Trust the Registry's TLS Certificate:** If the registry uses a self-signed or private CA certificate, `containerd` (the container runtime used by K3s) needs to be told to trust it.
+2.  **Authenticate to the Registry:** Provide the necessary credentials (username/password created via `htpasswd`) for pulling images.
+
+This configuration is done via K3s's `registries.yaml` file mechanism, which allows customizing container runtime settings per registry.
+
+## 🧱 Placeholders for Concept/Architecture
+
+* Diagram: Kubelet/CRI (containerd) -> `registries.yaml` config -> Private Registry.
+* Explanation of how K3s applies `registries.yaml` to the underlying `containerd` configuration.
+
+## 🛠️ Implementation Steps
+
+**Applies to ALL K3s nodes (Masters and Agents) that might need to pull images from the private registry.**
+
+**1. Distribute the Registry CA Certificate**
+
+* **Identify Registry Hostname and Port:** Use the address nodes will use to connect. This should ideally be the Nginx proxy address (e.g., `hostname:8443`) from `registry/setup.mdx`. The original guide examples use `web.ctf.htl-villach.at:5000` and `registry:5000`. **Use the address that nodes can resolve and reach.** Let's assume `hostname:8443`.
+* **Copy Cert to Nodes:** Securely copy the registry's CA certificate (`domain.crt` from `~/docker-registry/certs/` on the registry host) to each K3s node.
+    ```bash
+    # On EACH K3s Node (Master/Agent)
+    REGISTRY_HOST_PORT="hostname:8443" # Replace with your actual registry address:port
+    REGISTRY_HOST=$(echo <span class="math-inline">REGISTRY\_HOST\_PORT \| cut \-d'\:' \-f1\)
+    CERT\_DIR\="/etc/rancher/k3s/certs\.d/</span>{REGISTRY_HOST_PORT}" # K3s specific certs dir structure
+
+    sudo mkdir -p "<span class="math-inline">\{CERT\_DIR\}"
+    \# Use scp or another method to copy the cert from registry host
+    sudo scp user@registry\_server\_ip\:\~/docker\-registry/certs/domain\.crt "</span>{CERT_DIR}/ca.crt"
+    sudo chmod 644 "<span class="math-inline">\{CERT\_DIR\}/ca\.crt"
+    sudo chown root\:root "</span>{CERT_DIR}/ca.crt"
+    ```
+    *Note: The original guide placed the cert in `/var/lib/rancher/k3s/agent/etc/containerd/certs.d/` and also `/etc/rancher/k3s/certs/ca.crt`. Using `/etc/rancher/k3s/registries.yaml` with a `ca_file` path is the cleaner K3s way.* We will reference the copied cert path in `registries.yaml`.
+
+**2. Create/Edit `registries.yaml`**
+
+* Create or edit the file `/etc/rancher/k3s/registries.yaml` on **each** K3s node (Master/Agent).
+    ```yaml
+    # /etc/rancher/k3s/registries.yaml
+    # Define mirrors (optional, can improve availability/performance)
+    # mirrors:
+    #   "docker.io": # Example: Mirroring Docker Hub
+    #     endpoint:
+    #       - "[https://registry-1.docker.io](https://www.google.com/search?q=https://registry-1.docker.io)"
+
+    # Configuration for specific registries
+    configs:
+      # Use the same hostname:port as used for the certificate directory
+      "hostname:8443": # Replace with your actual registry address:port
+        auth:
+          # Use credentials created with htpasswd for the registry
+          username: "myuser"     # Replace with your registry username
+          password: "mypassword" # Replace with your registry password
+        tls:
+          # Point to the CA certificate copied in Step 1
+          # Use the path where you copied ca.crt for this specific registry host:port
+          ca_file: "/etc/rancher/k3s/certs.d/hostname:8443/ca.crt" # Adjust path if needed
+          # insecure_skip_verify: false # Default: Set to true only if absolutely necessary (disables TLS check)
+    ```
+    *Make sure the key under `configs:` (e.g., `"hostname:8443"`) exactly matches the registry address used in image names (e.g., `hostname:8443/my-app:v1.0`).*
+
+**3. Restart K3s Service**
+
+* Changes to `registries.yaml` require restarting the K3s service to be applied to `containerd`.
+    * On Masters: `sudo systemctl restart k3s`
+    * On Agents: `sudo systemctl restart k3s-agent`
+
+**4. Verify (Optional)**
+
+* You can test image pulling directly on a node using `crictl` (Kubelet CRI interaction tool). This requires `containerd` to be running.
+    ```bash
+    # On a K3s node after restarting the service
+    # Assumes containerd socket is at /run/k3s/containerd/containerd.sock
+    sudo crictl --runtime-endpoint unix:///run/k3s/containerd/containerd.sock pull hostname:8443/my-app:v1.0 # Use an image known to be in the registry
+    # Expect output indicating successful pull or image already present.
+    sudo crictl --runtime-endpoint unix:///run/k3s/containerd/containerd.sock images | grep hostname:8443
+    ```
+
+**5. Use in Deployments (`imagePullSecrets` Alternative)**
+
+* Once `registries.yaml` is configured on all nodes, pods should be able to pull images from `hostname:8443/my-repo` without needing an `imagePullSecrets` entry in their manifest, as `containerd` itself is now authenticated.
+* However, using `imagePullSecrets` (as shown in `cluster/challenge-deployment.mdx`) is often considered better practice:
+    * It doesn't require storing plain credentials in `registries.yaml` on every node.
+    * Credentials are managed as Kubernetes secrets, aligning better with K8s practices.
+* **If using `registries.yaml` for auth, you can likely remove the `imagePullSecrets` section from `deployment.yml`. If using `imagePullSecrets`, the `auth:` section in `registries.yaml` might be redundant (but the `tls:` section is still needed for self-signed certs).**
+* **Setup using `imagePullSecrets` (Recommended Method):**
+    1.  Ensure registry CA cert is trusted (Step 1 & `tls:` section in `registries.yaml` on all nodes, restart K3s).
+    2.  Create a Kubernetes secret of type `docker-registry`:
+        ```bash
+        kubectl create secret docker-registry registry-credentials \
+          --docker-server=hostname:8443 \
+          --docker-username=myuser \
+          --docker-password=mypassword \
+          --namespace=<target-namespace> # e.g., namespace-team-1 or default
+        ```
+    3.  Reference this secret in the Pod spec:
+        ```yaml
+        # In deployment.yml -> spec: -> template: -> spec:
+        spec:
+          # ... other pod spec ...
+          imagePullSecrets:
+          - name: registry-credentials
+        ```
+
+## ⚠️ Tips, Caveats, Troubleshooting
+
+* **Consistency:** The registry hostname and port (`hostname:8443`) must be identical in `registries.yaml`, the certificate directory name (`/etc/rancher/k3s/certs.d/hostname:8443`), and the image names used in Kubernetes manifests.
+* **Restart Required:** K3s/K3s-agent *must* be restarted after changing `registries.yaml` or adding certificates to the expected
+
+## 📄 Clear Formatting, Tested Shell/YAML Blocks
+
+Code blocks contain tested commands and configurations. Replace placeholders like `<LB_IP_ADDRESS>`, `<MASTERx_IP_ADDRESS>`, credentials, and hostnames.
