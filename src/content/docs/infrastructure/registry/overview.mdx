@@ -1,17 +1,42 @@
 ---
-title: Infrastructure Overview
-description: Overview of the CTF FlagFrenzy infrastructure
+title: Registry | Overview
+description: Overview of the CTF FlagFrenzy Registry
 ---
 
-# Infrastructure Overview
+Some Text 
 
-CTF FlagFrenzy is built on a modern, containerized infrastructure designed for scalability, security, and reliability.
+## 🧠 Context and Reasoning
 
-## Core Components
+A private Docker registry is essential for this infrastructure to host custom-built container images, such as the CTF challenges. Using a private registry ensures that images are readily available within the cluster network without relying on public registries like Docker Hub. This also provides better control over image access and security.
 
-- Kubernetes (K3s) for container orchestration
-- Docker for containerization
-- Traefik for ingress control
-- Prometheus and Grafana for monitoring
-- PostgreSQL for persistent data storage
-- Redis for caching and pub/sub
+This setup uses the official `registry:2` image, secured with TLS (HTTPS) and basic authentication (`htpasswd`). An Nginx proxy is used to handle TLS termination and route requests, while a companion UI (`joxit/docker-registry-ui`) provides a web interface for Browse the registry content.
+
+## 🧱 Architecture Overview (Placeholder)
+
+*(Placeholder: Add a simple diagram showing Client -> Nginx (Port 8443/HTTPS) -> Registry UI / Registry Service (Port 5000/HTTPS within Docker network))*
+
+**Components:**
+
+* **Docker Registry (`registry:2`):** Stores the actual image layers. Configured for TLS, htpasswd authentication, and image deletion.
+* **Registry UI (`joxit/docker-registry-ui`):** Provides a web interface to view repositories and tags. Connects to the registry service.
+* **Nginx:** Acts as a reverse proxy, exposing the UI and registry API (`/v2/`) via a single HTTPS port (8443). Handles TLS termination using provided certificates.
+* **Authentication (`htpasswd`):** Basic authentication restricts push/pull access.
+* **Certificates (`openssl`):** Self-signed certificates enable HTTPS.
+* **Portainer (Optional):** Included for managing the registry stack containers.
+
+## 🛠️ Implementation Steps
+
+1.  **Setup:** Prepare directories, generate authentication credentials (`htpasswd`), and create TLS certificates (`openssl`). (Covered in `setup.mdx`)
+2.  **Deployment:** Define and deploy the services (Registry, UI, Nginx, Portainer) using `docker-compose`. (Covered in `setup.mdx`)
+3.  **Usage:** Configure Docker clients (and K3s agents) to trust the registry's certificate and use the credentials to log in, push, and pull images. (Covered in `usage.mdx`)
+
+## ⚠️ Tips, Caveats, Troubleshooting
+
+* The registry requires `htpasswd` credentials generated with bcrypt (`-B` flag).
+* Ensure the hostname/DNS names used during certificate generation match how clients will access the registry. Add all relevant names (hostname, `registry`, `web.ctf.htl-villach.at`) to the certificate's Subject Alternative Name (SAN).
+* Client machines (including K3s nodes) must be configured to trust the registry's CA certificate.
+* Image deletion is enabled but might require garbage collection to free up space (consult Docker Registry documentation).
+
+## 📄 Clear Formatting, Tested Shell/YAML Blocks
+
+The configuration files (`docker-compose.yaml`, `nginx.conf`) and setup commands are detailed in `setup.mdx`. Usage commands are in `usage.mdx`.

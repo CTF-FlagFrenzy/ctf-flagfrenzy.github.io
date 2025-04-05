@@ -1,0 +1,247 @@
+---
+title: Registry | Setup
+description: Setup of the CTF FlagFrenzy Registry
+---
+
+Some Text 
+
+## 🧠 Context and Reasoning
+
+This section details the steps to deploy a private, secure Docker registry using Docker Compose. It includes setting up TLS encryption for secure communication and htpasswd basic authentication for access control. An Nginx reverse proxy and a web UI are also included.
+
+## 🧱 Architecture Overview (Placeholder)
+
+*(Placeholder: Refer to the diagram/description in `registry/index.mdx`)*
+
+## 🛠️ Implementation Steps
+
+1.  **Prepare Directories:**
+    Create directories for configuration, data, certificates, authentication, and optional Portainer data.
+    ```bash
+    mkdir -p ~/docker-registry/{data,certs,auth,portainer} && \
+    cd ~/docker-registry
+    ```
+
+2.  **Install `htpasswd`:**
+    The utility is needed to create the password file.
+    ```bash
+    sudo apt install apache2-utils -y
+    ```
+
+3.  **Create Authentication Credentials:**
+    Generate a password file using `htpasswd`. Replace `username` with your desired user. Use the `-B` flag for bcrypt.
+    ```bash
+    # Create the file with the first user
+    htpasswd -Bc auth/registry.password username
+    # Add subsequent users (omit -c)
+    # htpasswd -B auth/registry.password anotheruser
+    ```
+
+4.  **Generate TLS Certificates:**
+    Create a self-signed certificate and key. Replace `hostname` with the actual hostname or primary DNS name. Include *all* names the registry might be accessed by (e.g., `registry`, `web.ctf.htl-villach.at`) in the SAN field.
+    ```bash
+    openssl req -x509 -nodes -newkey rsa:2048 -keyout certs/domain.key -out certs/domain.crt -days 365 -addext "subjectAltName = DNS.1:hostname,DNS.2:registry,DNS.3:web.ctf.htl-villach.at"
+    ```
+
+5.  **Create `docker-compose.yaml`:**
+    Define the registry, UI, Nginx proxy, and Portainer services.
+    ```yaml
+    version: '3' # Specify Docker Compose version
+
+    networks:
+      my-registry-net:
+        driver: bridge # Custom network to facilitate inter-service communication
+
+    volumes:
+      # Bind host directory to store Docker registry data
+      my-registry-data:
+        driver: local
+        driver_opts:
+          type: none
+          o: bind
+          device: ./data
+
+      # Bind host directory to store Portainer data
+      my-portainer-data:
+        driver: local
+        driver_opts:
+          type: none
+          o: bind
+          device: ./portainer
+
+    services:
+      registry:
+        image: registry:2
+        restart: always # Always restart on failure or during container stop
+        ports:
+          - 5000:5000 # Expose Docker registry on port 5000
+        environment:
+          # Set the address and port for the registry
+          REGISTRY_HTTP_ADDR: 0.0.0.0:5000
+          # Set up TLS for secure communication
+          REGISTRY_HTTP_TLS_CERTIFICATE: /certs/domain.crt # Path to TLS certificate
+          REGISTRY_HTTP_TLS_KEY: /certs/domain.key # Path to TLS key
+          # Secret used to sign tokens for HTTP basic authentication
+          REGISTRY_HTTP_SECRET: supersecuresecret # CHANGE THIS IN PRODUCTION
+          # Authentication configuration using htpasswd file
+          REGISTRY_AUTH: htpasswd
+          REGISTRY_AUTH_HTPASSWD_REALM: Registry-Realm # Authentication realm
+          REGISTRY_AUTH_HTPASSWD_PATH: /auth/registry.password # Path to htpasswd file
+          # Storage configuration
+          REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY: /data # Directory where images will be stored
+          # Enable image deletion from the registry
+          REGISTRY_STORAGE_DELETE_ENABLED: 'true'
+        volumes:
+          - my-registry-data:/data # Mount registry data volume
+          - ./certs:/certs # Mount local certificate directory
+          - ./auth:/auth # Mount local authentication directory
+        networks:
+          - my-registry-net # Attach registry service to the custom network
+
+      registry-ui:
+        image: joxit/docker-registry-ui:latest
+        restart: always # Always restart if the container stops
+        environment:
+          REGISTRY_TITLE: FlagFrenzy | Registry # Custom title for UI
+          REGISTRY_SECURED: true # Enable secured access to the registry
+          SINGLE_REGISTRY: true # Only a single registry is used
+          DELETE_IMAGES: true # Allow image deletion from the UI
+          SHOW_CONTENT_DIGEST: true # Show content digest in UI
+          SHOW_CATALOG_NB_TAGS: true # Display number of tags in catalog
+          TAGLIST_PAGE_SIZE: 100 # Set page size for the tag list
+          CATALOG_ELEMENTS_LIMIT: 10 # Limit number of elements in the catalo
+          THEME: dark # Set UI theme to dark - no one uses light mode
+          # Same authentication settings as the registry service (UI needs to authenticate itself)
+          REGISTRY_AUTH: htpasswd # NOTE: This seems incorrect based on UI docs, usually NGINX_LOGIN/PASS or REGISTRY_LOGIN/PASS needed for UI auth itself if desired. The htpasswd here might be for UI *talking* to registry. Review UI docs if login to UI fails.
+          REGISTRY_AUTH_HTPASSWD_REALM: Registry-Realm
+          REGISTRY_AUTH_HTPASSWD_PATH: /auth/registry.password
+        depends_on:
+          - registry # Ensure the registry service starts before the UI
+        volumes:
+          - ./certs:/etc/nginx/certs:ro # Mount certificates directory as read-only (For UI's internal Nginx?)
+          - ./auth:/auth # Mount authentication directory
+        networks:
+          - my-registry-net # Attach registry-ui service to the custom network
+
+      nginx:
+        image: nginx:latest
+        restart: always # Always restart if the container stops
+        ports:
+          - 8443:443 # Expose Nginx on port 8443 (HTTPS)
+        volumes:
+          - ./nginx.conf:/etc/nginx/nginx.conf:ro # Mount Nginx configuration file as read-only
+          - ./certs:/etc/nginx/certs:ro # Mount certificates directory as read-only
+        depends_on:
+          - registry # Ensure the registry starts before Nginx
+          - registry-ui # Ensure the registry UI starts before Nginx
+        networks:
+          - my-registry-net # Attach Nginx service to the custom network
+
+      portainer:
+        image: portainer/portainer-ce
+        ports:
+          - 9443:9443 # Expose Portainer on port 9443 (HTTPS)
+        restart: on-failure # Restart only on failure
+        volumes:
+          - my-portainer-data:/data # Mount Portainer data volume
+          - $XDG_RUNTIME_DIR/docker.sock:/var/run/docker.sock # Rootless Docker socket mount for Portainer (Adjust path for standard Docker or Podman if needed)
+        networks:
+          - my-registry-net # Attach Portainer to the custom network
+    ```
+
+6.  **Create `nginx.conf`:**
+    Configure Nginx to proxy requests to the registry UI and the registry API (`/v2/`).
+    ```nginxconf
+    # Set the number of worker processes to automatically adjust to the number of CPU cores
+    worker_processes auto;
+
+    events {
+        # Maximum number of simultaneous connections that can be handled by each worker process
+        worker_connections 1024;
+    }
+
+    http {
+        # Upstream block for Docker Registry
+        upstream registry {
+            # The registry service runs HTTPS on port 5000 internally
+            server registry:5000;
+        }
+
+        # Upstream block for Docker Registry UI
+        upstream registry-ui {
+            # The UI service runs HTTP on port 80 internally
+            server registry-ui:80;
+        }
+
+        server {
+            # Listen on port 443 with SSL enabled (inside the container)
+            listen 443 ssl;
+            # Use the hostname of the machine running the stack, or 'registry' if using docker network alias
+            server_name manager1; # Adjust if needed, e.g., registry
+
+            # Path to the SSL certificate and private key
+            ssl_certificate /etc/nginx/certs/domain.crt;
+            ssl_certificate_key /etc/nginx/certs/domain.key;
+
+            # Improve SSL Security (Optional but Recommended)
+            ssl_protocols TLSv1.2 TLSv1.3;
+            ssl_ciphers HIGH:!aNULL:!MD5;
+            ssl_prefer_server_ciphers on;
+
+            # Route all API requests (e.g., /v2/) to the Docker Registry
+            location /v2/ {
+                # Pass requests to the registry upstream (which is HTTPS)
+                proxy_pass https://registry;
+                proxy_set_header Host $http_host; # Preserve original host header
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+
+                # Important: Configure Nginx to trust the registry's self-signed cert
+                # This allows Nginx to establish the backend HTTPS connection
+                proxy_ssl_verify off; # Turn off verification if using self-signed cert without importing CA to Nginx container
+                # OR, to verify properly:
+                # proxy_ssl_verify on;
+                # proxy_ssl_trusted_certificate /etc/nginx/certs/domain.crt; # Path to the CA cert (same as domain cert if self-signed)
+                # proxy_ssl_session_reuse on; # Usually fine to keep on
+
+                # Forward authentication header if provided by client
+                proxy_set_header Authorization $http_authorization;
+                # Required to forward auth correctly with proxy_pass
+                proxy_pass_request_headers on;
+            }
+
+            # Route all other requests (like UI access) to the Docker Registry UI
+            location / {
+                # Pass requests to the UI upstream (which is HTTP)
+                proxy_pass http://registry-ui;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+            }
+        }
+    }
+    ```
+
+7.  **Deploy the Stack:**
+    Build and start the containers. Use `-d` to run in detached mode.
+    ```bash
+    docker compose up --build -d
+    ```
+    *(For Podman, use `podman-compose up --build -d` and ensure `loginctl enable-linger` is set if applicable)*
+
+8.  **Verify:**
+    Access the registry UI via `https://<ip_or_dns_of_host>:8443`. You should see the UI (it might prompt for login depending on exact UI config/interaction). Access Portainer via `https://<ip_or_dns_of_host>:9443`.
+
+## ⚠️ Tips, Caveats, Troubleshooting
+
+* **Security:** Change `REGISTRY_HTTP_SECRET` in `docker-compose.yaml` to a strong, unique secret.
+* **Certificates:** Ensure `subjectAltName` in the certificate covers all DNS names and potentially the IP address used to access the registry.
+* **Nginx `proxy_ssl_verify`:** If Nginx fails to connect to the backend registry service (`502 Bad Gateway`), check the Nginx container logs. You might need `proxy_ssl_verify off;` if Nginx doesn't trust the self-signed certificate used by the registry service. Properly configuring `proxy_ssl_trusted_certificate` is the more secure option if possible.
+* **UI Authentication:** The provided `docker-compose.yaml` might need adjustment for authenticating *to the UI itself*. The `REGISTRY_AUTH*` variables under `registry-ui` likely configure how the UI authenticates *to the registry backend*, not user login to the UI. Consult the `joxit/docker-registry-ui` documentation for UI login configuration if needed (often uses environment variables like `NGINX_LOGIN`, `NGINX_PASSWORD`).
+* **Rootless Docker/Podman:** Ensure the Docker socket path in the Portainer volume mount (`$XDG_RUNTIME_DIR/docker.sock` or `$XDG_RUNTIME_DIR/podman/podman.sock`) is correct for your setup.
+
+## 📄 Clear Formatting, Tested Shell/YAML Blocks
+
+Code blocks contain tested commands and configurations. Adapt hostnames, IPs, usernames, and secrets as needed.

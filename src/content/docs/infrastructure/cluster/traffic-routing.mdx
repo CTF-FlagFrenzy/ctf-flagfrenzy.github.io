@@ -1,0 +1,237 @@
+---
+title: Cluster | Traffic Routing
+description: Traffic Routing of the CTF FlagFrenzy Cluster
+---
+
+Some Text
+
+## 🧠 Context and Reasoning
+
+Effective traffic routing is essential for directing external requests to the correct services within the cluster or on the infrastructure hosts. This involves configuring the main Nginx Load Balancer to handle different types of traffic and setting up DNS resolution (even if only locally) for the various hostnames used.
+
+The Load Balancer needs to:
+1.  Load balance raw TCP traffic for the K3s API server (port 6443).
+2.  Proxy HTTP/HTTPS traffic for deployed applications (challenges) to the K3s Ingress Controller (Traefik).
+3.  Proxy specific API calls (`/deploy`, `/deprovision`, `/teamkey`) to the FastAPI deployment service.
+4.  Handle TLS termination and potentially HTTP-to-HTTPS redirection for web traffic.
+
+## 🧱 Architecture Overview (Placeholder)
+
+*(Placeholder: Diagram showing External User -> DNS -> LB IP. Then LB directs traffic based on port/hostname/path: Port 6443 -> K3s Masters; Port 80/443 with *.web.ctf... hostname -> Traefik Nodes; Port 443 with specific paths like /deploy -> FastAPI Nodes.)*
+
+## 🛠️ Implementation Steps
+
+### Load Balancer Nginx Configuration (`~/loadbalancer/nginx.conf`)
+
+Modify the Nginx configuration on the Load Balancer host. This combines the initial `stream` block for K3s API with an `http` block for web/API traffic.
+
+1.  **Edit `~/loadbalancer/nginx.conf`:**
+    ```nginxconf
+    worker_processes auto;
+
+    events {
+        worker_connections 1024;
+    }
+
+    # TCP Load Balancer for K3s API Server (Port 6443)
+    stream {
+      upstream k3s_servers {
+        least_conn;
+        server <MASTER1_IP_ADDRESS>:6443;
+        server <MASTER2_IP_ADDRESS>:6443;
+      }
+
+      server {
+        listen 6443;
+        proxy_pass k3s_servers;
+      }
+    }
+
+    # HTTP/HTTPS Load Balancer for Applications and API (Ports 80/443)
+    http {
+      # Upstream for K3s Ingress Controller (Traefik NodePorts)
+      upstream traefik_nodes {
+          least_conn;
+          # Find the NodePort for Traefik's websecure (HTTPS) or web (HTTP) service
+          # kubectl get svc -n kube-system traefik
+          # Example uses HTTPS NodePort 32430 (replace with actual port)
+          server <MASTER1_IP_ADDRESS>:32430; # Use Master IPs as they usually host ingress LBs in K3s HA
+          server <MASTER2_IP_ADDRESS>:32430;
+          # Alternatively, use Agent IPs if Traefik runs there via DaemonSet/NodePort
+          # server <AGENT1_IP_ADDRESS>:32430;
+          # server <AGENT2_IP_ADDRESS>:32430;
+      }
+
+      # Upstream for FastAPI Deployment Service
+      upstream fastapi_nodes {
+          least_conn;
+          server <MASTER1_IP_ADDRESS>:8080; # FastAPI runs on Masters port 8080
+          server <MASTER2_IP_ADDRESS>:8080;
+      }
+
+      # --- Server Block for Redirecting HTTP to HTTPS ---
+      server {
+          listen 80;
+          # Listen for any subdomain of web.ctf.htl-villach.at
+          server_name ~^(?<subdomain>.+)\.web\.ctf\.htl-villach\.at$;
+          # Also listen for the base domain if needed
+          # server_name ct.ctf.htl-villach.at; # If API calls use base domain
+
+          # Permanent redirect to HTTPS
+          return 301 https://$host$request_uri;
+      }
+
+      # --- Server Block for Handling HTTPS Traffic ---
+      server {
+          listen 443 ssl http2; # Enable SSL and HTTP/2
+          # Listen for any subdomain of web.ctf.htl-villach.at
+          server_name ~^(?<subdomain>.+)\.web\.ctf\.htl-villach\.at$;
+          # Also listen for the base domain if API calls use it
+          # server_name ct.ctf.htl-villach.at;
+
+          # SSL Certificate Configuration
+          ssl_certificate /etc/nginx/certs/domain.crt; # Ensure this cert is valid for *.web.ctf.htl-villach.at or includes SANs
+          ssl_certificate_key /etc/nginx/certs/domain.key;
+          # Add recommended SSL settings (protocols, ciphers)
+          ssl_protocols TLSv1.2 TLSv1.3;
+          ssl_ciphers HIGH:!aNULL:!MD5;
+          ssl_prefer_server_ciphers on;
+
+          # --- Location block for FastAPI teamkey endpoint ---
+          location = /teamkey { # Exact match for /teamkey path
+              # Restrict access to specific IP(s) (e.g., the webapp calling the API)
+              allow 172.23.0.55; # Example IP from original config
+              # deny all; # Deny all other IPs
+
+              proxy_pass http://fastapi_nodes; # Proxy to FastAPI (HTTP backend)
+              # Standard proxy headers
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme;
+          }
+
+          # --- Location block for FastAPI deploy endpoint ---
+          location = /deploy { # Exact match
+              allow 172.23.0.55; # Restrict access
+              # deny all;
+
+              proxy_pass http://fastapi_nodes;
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme;
+          }
+
+          # --- Location block for FastAPI deprovision endpoint ---
+          location = /deprovision { # Exact match
+              allow 172.23.0.55; # Restrict access
+              # deny all;
+
+              proxy_pass http://fastapi_nodes;
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme;
+          }
+
+          # --- Default Location: Proxy everything else to K3s Ingress (Traefik) ---
+          location / {
+              # Proxy to Traefik nodes (HTTPS backend expected if using HTTPS NodePort)
+              # Adjust scheme if Traefik NodePort is HTTP
+              proxy_pass https://traefik_nodes;
+              proxy_set_header Host $host; # Pass original hostname
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme; # Let Traefik know original request was HTTPS
+              # Add websocket headers if needed
+              # proxy_http_version 1.1;
+              # proxy_set_header Upgrade $http_upgrade;
+              # proxy_set_header Connection "upgrade";
+          }
+      }
+    }
+    ```
+
+2.  **Update LB `docker-compose.yml`:** Ensure ports 80 and 443 are exposed by the Nginx service, and the certificate volume is mounted.
+    ```yaml
+    # ~/loadbalancer/docker-compose.yml (nginx service part)
+    services:
+      nginx:
+        image: nginx:latest
+        restart: always
+        ports:
+          - 6443:6443 # K3s API LB
+          - 80:80     # HTTP Traffic
+          - 443:443   # HTTPS Traffic
+        volumes:
+          - ./nginx.conf:/etc/nginx/nginx.conf:ro
+          - ./certs:/etc/nginx/certs:ro # Mount certs for HTTPS
+        networks:
+          - my-loadbalancer-net
+      # ... other services (db, portainer)
+    ```
+
+3.  **Redeploy Nginx on LB:** Apply the configuration changes.
+    ```bash
+    cd ~/loadbalancer
+    # Stop and remove only the nginx container, keeping volumes
+    docker compose stop nginx
+    docker compose rm -f nginx
+    # Recreate and start nginx with new config/ports
+    docker compose up --build -d nginx # Or podman-compose
+    ```
+
+### Local DNS Setup (`dnsmasq` on a client/dev machine)
+
+This is useful for testing, allowing your local machine to resolve the challenge subdomains (`<hash>.web.ctf.htl-villach.at`) to the Load Balancer IP. **This is not a production DNS solution.**
+
+1.  **Install `dnsmasq`:**
+    ```bash
+    sudo apt-get update
+    sudo apt-get install dnsmasq -y
+    ```
+2.  **Configure `dnsmasq`:** Edit `/etc/dnsmasq.conf` (or create a file in `/etc/dnsmasq.d/`) to add address rules. Replace `<LB_IP_ADDRESS>` and the domain.
+    ```conf
+    # /etc/dnsmasq.conf or /etc/dnsmasq.d/local-dev.conf
+    # Resolve the base domain and any subdomains to the LB IP
+    address=/web.ctf.htl-villach.at/<LB_IP_ADDRESS>
+    # Optionally, add specific entries if needed
+    # address=/ct.ctf.htl-villach.at/<LB_IP_ADDRESS>
+    ```
+3.  **Configure System Resolver:** Tell your local machine to use `dnsmasq` running locally (127.0.0.1) for DNS queries.
+    * **Method A (Disable `systemd-resolved`):** **Use with caution**, as this affects all DNS resolution.
+        ```bash
+        # Check if systemd-resolved is active and managing /etc/resolv.conf
+        ls -l /etc/resolv.conf
+        sudo systemctl disable --now systemd-resolved
+        sudo rm -f /etc/resolv.conf # Backup first if needed
+        echo "nameserver 127.0.0.1" | sudo tee /etc/resolv.conf
+        # May need to add fallback public DNS: echo "nameserver 8.8.8.8" | sudo tee -a /etc/resolv.conf
+        ```
+    * **Method B (Configure NetworkManager):** Preferred method if using NetworkManager. Edit your connection settings (e.g., via GUI or `nmcli`) to add `127.0.0.1` as the *first* DNS server.
+4.  **Restart `dnsmasq`:**
+    ```bash
+    sudo systemctl restart dnsmasq
+    ```
+5.  **Verify DNS Resolution:**
+    ```bash
+    # Should resolve to LB IP
+    dig any-subdomain.web.ctf.htl-villach.at @127.0.0.1
+    # Test system resolution (should use 127.0.0.1 now)
+    dig any-subdomain.web.ctf.htl-villach.at
+    ping some-challenge-hash.web.ctf.htl-villach.at
+    ```
+
+## ⚠️ Tips, Caveats, Troubleshooting
+
+* **Nginx Config:** Carefully check Nginx syntax (`sudo nginx -t` inside container or mount config and test locally). Ensure `upstream` blocks use correct backend IPs/ports. Verify `server_name` directives match hostnames.
+* **Traefik NodePort:** Find the correct NodePort for Traefik using `kubectl get svc -n kube-system traefik`. Ensure the port used in the `traefik_nodes` upstream matches the `https` (usually) or `http` port exposed by Traefik's service. Verify firewall rules allow access to this NodePort on the nodes listed in the upstream block.
+* **Certificates:** The certificate mounted in the LB Nginx (`/etc/nginx/certs/domain.crt`) needs to be valid for the hostnames used in the `server_name` directives (e.g., `*.web.ctf.htl-villach.at`). Wildcard certificates or certificates with multiple SANs are needed.
+* **API Endpoint Security:** The `allow` / `deny` directives in Nginx provide basic network-level access control for the FastAPI endpoints. Ensure the allowed IP is correct.
+* **DNS Resolution:** The `dnsmasq` setup is **local only**. For wider access, proper DNS records (`A` record for the LB, potentially a wildcard `CNAME` or `A` record for `*.web.ctf.htl-villach.at`) need to be configured in your actual DNS provider.
+* **`systemd-resolved` Conflict:** `dnsmasq` and `systemd-resolved` both try to use port 53. Disabling `systemd-resolved` is one fix, but carefully consider the implications for overall system DNS. Configuring `dnsmasq` on a different port and forwarding queries or using NetworkManager integration might be alternatives.
+
+## 📄 Clear Formatting, Tested Shell/YAML Blocks
+
+Configuration snippets are provided. Replace IPs, hostnames, ports, and domains specific to your environment.

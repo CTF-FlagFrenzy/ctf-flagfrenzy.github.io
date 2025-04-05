@@ -1,0 +1,117 @@
+---
+title: Cluster | Troubleshooting
+description: Troubleshooting of the CTF FlagFrenzy Cluster
+---
+
+Some Text
+
+## 🧠 Context and Reasoning
+
+Deploying and managing a Kubernetes cluster involves multiple interacting components. Issues can arise during setup, deployment, or runtime. This guide provides common troubleshooting steps and checks for K3s, networking, application deployment, and the custom components used in this setup.
+
+## 🧱 Architecture Overview (Placeholder)
+
+*(Placeholder: Briefly reiterate the main components: LB, Masters, Agents, K3s control plane, Traefik, FastAPI, Registry, DNS. Highlight common points of failure.)*
+
+## 🛠️ Troubleshooting Steps & Areas
+
+### General Cluster Health
+
+1.  **Node Status:** Check if all master and agent nodes are `Ready`.
+    ```bash
+    # Run on a master node or via configured kubectl
+    kubectl get nodes -o wide
+    ```
+    *(If a node is `NotReady`, SSH into it and check `k3s` (master) or `k3s-agent` service status and logs: `sudo systemctl status k3s`/`k3s-agent`, `sudo journalctl -u k3s`/`k3s-agent -f`)*
+
+2.  **Component Status:** Check the health of core Kubernetes components.
+    ```bash
+    kubectl get componentstatuses # (May not be fully supported in K3s, primarily checks API server connectivity to control plane components)
+    ```
+3.  **K3s Service Logs:** Check K3s logs on masters and agents for errors.
+    ```bash
+    # On Master
+    sudo journalctl -u k3s -f
+    # On Agent
+    sudo journalctl -u k3s-agent -f
+    ```
+4.  **Resource Usage:** Check CPU/Memory usage on nodes.
+    ```bash
+    kubectl top nodes # Requires metrics-server (usually installed by default in K3s)
+    # On nodes directly:
+    top # or htop
+    ```
+
+### Networking Issues
+
+1.  **Pod Networking (CNI):** Check if CoreDNS and Flannel (or other CNI) pods are running correctly (usually in `kube-system`).
+    ```bash
+    kubectl get pods -n kube-system -l k8s-app=kube-dns # CoreDNS
+    kubectl get pods -n kube-flannel # Flannel (if using default)
+    # Check logs of failing pods:
+    # kubectl logs -n kube-system <pod_name>
+    ```
+2.  **Service Discovery (DNS):** Test DNS resolution from within a pod.
+    ```bash
+    # Launch a temporary busybox pod
+    kubectl run tmp-shell --rm -i --tty --image busybox -- /bin/sh
+    # Inside the pod's shell:
+    nslookup kubernetes.default.svc # Should resolve to cluster IP
+    nslookup <service-name>.<namespace> # e.g., nslookup grafana.monitoring
+    exit
+    ```
+    *(If DNS fails, check CoreDNS pods/logs and network policies)*.
+3.  **Service Connectivity:** Check if a Service has endpoints (running pods matching its selector).
+    ```bash
+    kubectl get svc <service-name> -n <namespace>
+    kubectl get endpoints <service-name> -n <namespace> # Should list pod IPs/ports
+    ```
+    *(If no endpoints, check if pods matching the service selector are running and ready. `kubectl describe svc ...`)*
+4.  **Ingress Connectivity:** Troubleshoot access via Ingress (Traefik).
+    * Check if Traefik pods are running: `kubectl get pods -n kube-system -l app.kubernetes.io/name=traefik`
+    * Check Traefik logs: `kubectl logs -n kube-system <traefik_pod_name>`
+    * Describe the Ingress resource: `kubectl describe ingress <ingress-name> -n <namespace>` (Check rules, backend service/port, annotations, events).
+    * Ensure the Service targeted by the Ingress exists and has endpoints.
+    * Check the Traefik Service NodePort: `kubectl get svc -n kube-system traefik` (Verify the NodePort used by the external LB).
+    * If Traefik seems stuck, try restarting it: `kubectl rollout restart deployment traefik -n kube-system`
+5.  **Load Balancer:** Check the external Nginx LB configuration (`nginx.conf`) and logs (`docker logs <nginx_container>`) for errors. Verify upstream blocks point to correct IPs/ports. Check firewall on LB host.
+6.  **Firewalls:** Ensure necessary ports are open between nodes (K3s ports, CNI ports, DB port 3306, registry port 5000, NodePorts). Check `ufw`, `firewalld`, or cloud provider security groups.
+
+### Application Deployment Issues (Challenges via FastAPI)
+
+1.  **FastAPI Service:** Check if the `fastapi-deployment-api` container is running on masters (`docker ps`). Check its logs (`docker logs fastapi-deployment-api`). Test API endpoints with `curl` (see `Cluster-Webapp-Interaction.md`).
+2.  **Deployment Scripts:** Check logs from FastAPI service for errors during script execution (`deploy.sh`, etc.). Manually run scripts with `bash -x ./deploy.sh ...` inside the container (`docker exec -it fastapi-deployment-api bash`) for debugging.
+3.  **Kubernetes Resources:** After calling `/deploy`, check if resources were created:
+    ```bash
+    kubectl get namespace namespace-team-<teamid>
+    kubectl get all -n namespace-team-<teamid> # Check deployment, pods, service, ingress
+    kubectl describe pod <pod_name> -n namespace-team-<teamid> # Check pod events, status
+    kubectl logs <pod_name> -n namespace-team-<teamid> # Check application logs inside pod
+    ```
+4.  **Image Pull Errors:** If pods are stuck in `ImagePullBackOff` or `ErrImagePull`:
+    * Verify the image exists in the private registry (`web.ctf.htl-villach.at:5000/<challenge>`).
+    * Verify K3s agents are configured correctly to trust the registry certificate and use credentials (`/etc/rancher/k3s/registries.yaml`). See `cluster/internal-registry.mdx`.
+    * Check `imagePullSecrets` in `deployment.yml` and ensure the `registry-credentials` secret exists in the pod's namespace and is usable (RBAC).
+    * Check `crictl` pull logs on the node where the pod is scheduled: `sudo crictl logs <container_id>` or check `journalctl -u k3s-agent`.
+
+### Registry Issues
+
+* See `registry/troubleshooting.mdx`.
+
+### General Tips
+
+* **Startup Order:** When restarting the whole environment, start components in order: External DB (if separate) -> Load Balancer -> K3s Masters -> K3s Agents. Wait for each stage to become ready.
+* **Describe Resources:** `kubectl describe <resource_type> <resource_name> -n <namespace>` provides detailed status, configuration, and events, which are invaluable for debugging.
+* **Check Events:** `kubectl get events -n <namespace> --sort-by='.lastTimestamp'` shows cluster events, often indicating reasons for failures (e.g., scheduling failures, image pull errors).
+
+## ⚠️ Common Issues Recap
+
+* **DNS Resolution Failure:** Check CoreDNS, `/etc/resolv.conf` on nodes/pods, `dnsmasq` if used locally.
+* **Certificate Errors:** Ensure clients (Docker CLI, K3s agents, browsers) trust self-signed CAs. Verify SANs in certificates.
+* **Authentication/Authorization:** Check tokens (`K3S_TOKEN`), API keys, `htpasswd`, Kubernetes secrets (`registry-credentials`), RBAC permissions (`kubectl auth can-i ...`).
+* **Network Connectivity/Firewalls:** Double-check required ports are open between all relevant components.
+* **Resource Exhaustion:** Check node CPU/memory usage. Pods might fail to schedule or get OOMKilled. Set resource requests/limits in deployments.
+
+## 📄 Clear Formatting, Tested Shell/YAML Blocks
+
+Commands provided are standard `kubectl` and Linux utilities useful for diagnostics. Adapt names and namespaces.

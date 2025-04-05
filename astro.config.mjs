@@ -30,12 +30,25 @@ export default defineConfig({
               label: 'Registry',
               items: [
                 { label: 'Registry | Overview', link: '/infrastructure/registry/overview' },
+                { label: 'Registry | Setup', link: '/infrastructure/registry/setup' },
+                { label: 'Registry | Usage', link: '/infrastructure/registry/usage' },
+                { label: 'Registry | Troubleshooting', link: '/infrastructure/registry/troubleshooting' },
               ]
             },
             {
               label: 'Cluster',
               items: [
                 { label: 'Cluster | Overview', link: '/infrastructure/cluster/overview' },
+                { label: 'Cluster | Initial Setup', link: '/infrastructure/cluster/init' },
+                { label: 'Cluster | Using Podman on Loadbalancer', link: '/infrastructure/cluster/podman-on-lb' },
+                { label: 'Cluster | Webapp Interaction', link: '/infrastructure/cluster/webapp-interaction' },
+                { label: 'Cluster | Challenge Deployment', link: '/infrastructure/cluster/challenge-deployment' },
+                { label: 'Cluster | FastAPI Endpoints', link: '/infrastructure/cluster/fastapi-endpoints' },
+                { label: 'Cluster | Traffic Routing', link: '/infrastructure/cluster/traffic-routing' },
+                { label: 'Cluster | Dashboard', link: '/infrastructure/cluster/dashboard' },
+                { label: 'Cluster | Internal Registry', link: '/infrastructure/cluster/internal-registry' },
+                { label: 'Cluster | Secrets', link: '/infrastructure/cluster/secrets' },
+                { label: 'Cluster | Troubleshooting', link: '/infrastructure/cluster/troubleshooting' },
               ]
             },
           ],

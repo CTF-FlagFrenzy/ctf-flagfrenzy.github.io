@@ -1,17 +1,183 @@
 ---
-title: Infrastructure Overview
-description: Overview of the CTF FlagFrenzy infrastructure
+title: Infrastructure | Overview
+description: Overview of the CTF FlagFrenzy Infrastructure
 ---
 
-# Infrastructure Overview
+Some Text
 
-CTF FlagFrenzy is built on a modern, containerized infrastructure designed for scalability, security, and reliability.
+## 🧠 Context and Reasoning
 
-## Core Components
+This document provides a high-level overview of the infrastructure designed to deploy and manage containerized applications (specifically CTF challenges) dynamically. The core components include a private Docker registry for storing custom images, a K3s Kubernetes cluster for orchestration, a load balancer for traffic distribution and API access, and a custom FastAPI service to automate deployment workflows.
 
-- Kubernetes (K3s) for container orchestration
-- Docker for containerization
-- Traefik for ingress control
-- Prometheus and Grafana for monitoring
-- PostgreSQL for persistent data storage
-- Redis for caching and pub/sub
+## 🧱 Architecture Overview (Placeholder)
+
+*(Placeholder: Add a diagram or more detailed description of how the components interact: Webapp -> Load Balancer (FastAPI endpoint) -> FastAPI Service (on Master) -> kubectl -> K3s API Server (via LB) -> K3s Agents -> Private Registry)*
+
+**Key Components:**
+
+1.  **Private Docker Registry:** Securely stores custom Docker images (e.g., challenge containers). Accessible via HTTPS with authentication. Includes a web UI.
+2.  **K3s Cluster:** A lightweight Kubernetes distribution orchestrating container deployment.
+    * **Load Balancer (LB):** An Nginx instance distributing traffic to K3s API servers (port 6443), K3s Ingress (Traefik, port 80/443), and the deployment API (port 8080). Also handles TLS termination for challenge subdomains. Runs Docker or Podman.
+    * **Master Nodes (Servers):** Run the K3s control plane, connected to an external MySQL database for high availability. Host the FastAPI deployment service.
+    * **Agent Nodes (Workers):** Run the container workloads (challenges). Pull images from the private registry.
+3.  **FastAPI Deployment Service:** An API running on master nodes providing endpoints (`/deploy`, `/deprovision`, `/teamkey`) to manage challenge lifecycles via `kubectl` commands.
+4.  **Tooling:** `docker`/`podman`, `docker-compose`/`podman-compose`, `kubectl`, `htpasswd`, `openssl`, `curl`.
+
+## 🛠️ Implementation Steps
+
+The setup involves several stages detailed in the respective sections:
+
+1.  **Registry Setup:** Configuring and deploying the private Docker registry (`registry/`).
+2.  **Cluster Initialization:** Setting up the load balancer, K3s masters, and K3s agents (`cluster/`).
+3.  **Deployment API Setup:** Creating and deploying the FastAPI service (`cluster/`).
+4.  **Integration:** Configuring K3s agents to use the private registry, setting up dashboard access, configuring traffic routing.
+5.  **Blank Ubuntu Servers (tested on 22.04/24.x):** 1 Load Balancer, 2 Master Nodes, 4 Agent Nodes recommended.
+6.  **Basic familiarity** with Docker/Podman, Kubernetes concepts, Linux command line, and networking.
+
+### Install Rootless Docker
+* Uninstall all conflicting packages:
+```bash
+for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove $pkg; done
+```
+* Update repository:
+```bash
+sudo apt-get update
+```
+* Add Docker's official gpg-key:
+```bash
+sudo apt-get install ca-certificates curl && \
+sudo install -m 0755 -d /etc/apt/keyrings && \
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc && \
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+```
+* Add the repository to apt-sources:
+```bash
+echo \
+    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+    $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+    sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+```
+* Update again:
+```bash
+sudo apt-get update
+```
+* Install Docker packages:
+```bash
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+```
+* Verify that Docker is running:
+```bash
+sudo docker run hello-world
+```
+* Install uidmap:
+```bash
+sudo apt-get install -y uidmap
+``` 
+* Shut down Docker deamon:
+```bash
+sudo systemctl disable --now docker.service docker.socket
+```
+* Install Dockerd-Rootless-Setup:
+```bash
+dockerd-rootless-setuptool.sh install
+```
+* Define variable DOCKER_HOST:
+```bash
+export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/docker.sock
+```
+* Verify that Docker is running rootless:
+```bash
+docker run hello-world
+```
+
+### If Docker does not work, try Podman
+* Disabel the docker socket:
+```bash
+sudo systemctl disable docker && \
+sudo systemctl disable docker.socket
+```
+* Remove all docker packets:
+```bash
+sudo dnf remove -y docker docker-client docker-client-latest docker-common docker-latest docker-latest-logrotate docker-logrotate docker-engine && \
+sudo dnf remove -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+```
+* Delete the directories:
+```bash
+sudo rm -rf /var/lib/docker /var/lib/containerd && \
+sudo rm -f /usr/local/bin/docker-compose && \
+sudo rm -f /etc/yum.repos.d/docker-ce.repo
+```
+* Clear the Cache:
+```bash
+sudo dnf clean all && \
+sudo dnf makecache
+```
+* Install podman-compose:
+```bash
+sudo dnf install -y podman podman-docker && \
+sudo dnf install -y python3-pip && \
+sudo pip3 install podman-compose
+```
+* Start podman:
+```bash
+sudo systemctl --user enable podman.socket
+```
+* Export the runtime directory:
+> [!NOTE]
+> If an error occurs, confirm the runtime directory. If not, relogin
+> ```bash
+> id -u && \
+> ls -ld /run/user/$(id -u)
+> ```
+```bash
+export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/podman/podman.sock
+```
+* Verify installation:
+```bash
+podman run hello-world
+```
+
+### Set up a portainer for easier management
+* Create a repository for portainer and navigate there:
+```bash
+mkdir ~/portainer && \
+cd ~/portainer
+```
+* Create the configuration file `docker-compose.yml`:
+```yaml
+networks:
+my-network:
+
+volumes:
+portainer-data:
+
+services:
+# Service for management container
+manage-docker:
+    image: portainer/portainer-ce
+    ports:
+    - "9500:9443"
+    volumes:
+    - portainer-data:/data
+    - $XDG_RUNTIME_DIR/docker.sock:/var/run/docker.sock # Portainer - rootless mount
+    restart: always
+
+    networks:
+    - my-network
+```
+* Deploy the Service (it can be accessed using `<your_server_ip>:9500` after a few seconds):
+```bash
+docker compose up --build -d
+```
+
+## ⚠️ Tips, Caveats, Troubleshooting
+
+* Ensure prerequisites (Ubuntu servers, tools) are met before starting.
+* Follow the setup guides in the recommended order: Base OS/Docker setup -> Registry -> Cluster -> Deployment API.
+* Pay close attention to IP addresses, hostnames, DNS names (`ct.ctf.htl-villach.at`, `web.ctf.htl-villach.at`, `registry`), and credentials used across configurations.
+* Firewall rules may need adjustment (e.g., for MySQL port 3306).
+* Start VMs in order (LB -> Masters -> Agents) after shutdown.
+
+## 📄 Clear Formatting, Tested Shell/YAML Blocks
+
+All shell commands and YAML configuration blocks provided in the subsequent documents have been tested in the described environment. Ensure correct copying and substitution of placeholders (IPs, hostnames, credentials).

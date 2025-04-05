@@ -1,0 +1,247 @@
+---
+title: Cluster | Initial Setup
+description: Initial Setup of the CTF FlagFrenzy Cluster
+---
+
+Some Text
+
+## 🧠 Context and Reasoning
+
+This section covers the initial setup of the core K3s cluster components: the load balancer providing the API endpoint, the K3s master nodes forming the control plane, and the K3s agent nodes that will run the workloads. Using an external database (MySQL) and load balancing the API server provides high availability for the control plane.
+
+## 🧱 Architecture Overview (Placeholder)
+
+*(Placeholder: Focus on the LB -> Masters -> DB interaction, and Agents -> LB connection)*
+
+## 🛠️ Implementation Steps
+
+### Phase 1: Set up the Load Balancer Host
+
+1.  **Prerequisites:** Ensure Docker or Podman is installed on the LB host (see `README.md` or `cluster/podman-on-lb.mdx`).
+2.  **Add Host Entry (Optional but Recommended):** Add the LB's DNS name (e.g., `ct.ctf.htl-villach.at`) to its own `/etc/hosts` file for consistency. Replace `ip` with the LB's actual IP.
+    ```bash
+    sudo -- sh -c "echo '<LB_IP_ADDRESS> ct.ctf.htl-villach.at' >> /etc/hosts"
+    ```
+3.  **Prepare Directories:**
+    ```bash
+    mkdir -p ~/loadbalancer/{db,portainer,certs} && \
+    cd ~/loadbalancer
+    ```
+4.  **Generate Certificate for LB (Optional but good practice):** Although K3s uses its own certs, creating one for the LB itself can be useful if exposing other services via it. Add relevant DNS names.
+    ```bash
+    # This cert is mainly for the LB Nginx itself, potentially for HTTPS on port 443 later.
+    # K3s interaction on 6443 is raw TCP stream.
+    openssl req -x509 -nodes -newkey rsa:2048 -keyout certs/domain.key -out certs/domain.crt -days 365 -addext "subjectAltName = DNS.1:hostname,DNS.2:ct.ctf.htl-villach.at"
+    ```
+5.  **Create `.env` File:** Store sensitive data like DB credentials and K3s token. **Ensure `K3S_TOKEN` is strong and secure.**
+    ```sh
+    # ~/loadbalancer/.env
+    MYSQL_DATABASE=k3s
+    MYSQL_USER=k3s
+    MYSQL_PASSWORD=MySuperSecurePassw0rd # CHANGE THIS
+    MYSQL_ROOT_PASSWORD=MySuperSecureR00tPassw0rd # CHANGE THIS
+    MYSQL_DATABASE_PORT=3306
+    MYSQL_DATABASE_HOST=ct.ctf.htl-villach.at # Use the LB's address/DNS
+    K3S_TOKEN=MySuperSecureT0ken # CHANGE THIS TO A STRONG RANDOM TOKEN
+    ```
+6.  **Create `docker-compose.yml` for LB Services:** Define Nginx (for K3s API LB), MySQL, and Portainer.
+    ```yaml
+    # ~/loadbalancer/docker-compose.yml
+    version: '3'
+
+    networks:
+      my-loadbalancer-net:
+        driver: bridge
+
+    volumes:
+      my-database-data:
+        driver: local
+        driver_opts:
+          type: none
+          o: bind
+          device: ./db
+      my-portainer-data:
+        driver: local
+        driver_opts:
+          type: none
+          o: bind
+          device: ./portainer
+
+    services:
+      nginx:
+        image: nginx:latest
+        restart: always
+        ports:
+          - 6443:6443 # K3s API Server LB Port
+          # Add ports 80 & 443 later for Traefik/App LB (see traffic-routing.mdx)
+        volumes:
+          - ./nginx.conf:/etc/nginx/nginx.conf:ro
+          # Add certs mount later if needed for port 443
+          # - ./certs:/etc/nginx/certs:ro
+        networks:
+          - my-loadbalancer-net
+
+      db:
+        image: mysql:latest
+        restart: always
+        volumes:
+          - my-database-data:/var/lib/mysql
+        env_file: .env
+        environment:
+          MYSQL_DATABASE: ${MYSQL_DATABASE}
+          MYSQL_USER: ${MYSQL_USER}
+          MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+          MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+          # MYSQL_DATABASE_PORT is not directly used by MySQL container, 3306 is default
+        networks:
+          - my-loadbalancer-net
+        ports:
+          - "3306:3306" # Expose DB port (ensure firewall allows access from Masters)
+        healthcheck:
+          # Note: Healthcheck uses env vars defined *within the compose file's scope*
+          # Requires mysql-client inside the container or adjust command. Simpler check:
+          test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost", "-u${MYSQL_USER}", "-p${MYSQL_PASSWORD}"]
+          interval: 10s
+          retries: 5
+          start_period: 30s
+          timeout: 5s
+
+      portainer:
+        image: portainer/portainer-ce
+        restart: on-failure
+        ports:
+          - 9443:9443
+        volumes:
+          - my-portainer-data:/data
+          # Adjust socket path for rootless/Podman if needed
+          - /var/run/docker.sock:/var/run/docker.sock # Standard Docker
+          # - $XDG_RUNTIME_DIR/docker.sock:/var/run/docker.sock # Rootless Docker
+          # - $XDG_RUNTIME_DIR/podman/podman.sock:/var/run/docker.sock # Podman
+        networks:
+          - my-loadbalancer-net
+    ```
+7.  **Create `nginx.conf` for K3s API LB:** Use the `stream` context for TCP load balancing. Replace IPs with your Master Node IPs.
+    ```nginxconf
+    # ~/loadbalancer/nginx.conf
+    events {}
+
+    # TCP Load Balancer for K3s API Server
+    stream {
+      upstream k3s_servers {
+        least_conn; # Or round-robin (default)
+        server <MASTER1_IP_ADDRESS>:6443;
+        server <MASTER2_IP_ADDRESS>:6443;
+        # Add more master IPs if applicable
+      }
+
+      server {
+        listen 6443;
+        proxy_pass k3s_servers;
+        # Add proxy_timeout, proxy_connect_timeout if needed
+      }
+    }
+
+    # Add http block later for Traefik/App LB (see traffic-routing.mdx)
+    # http { ... }
+    ```
+8.  **Deploy LB Services:**
+    ```bash
+    # Ensure linger is enabled if using Podman/rootless and you need services after logout
+    # loginctl enable-linger $(whoami)
+    docker compose up --build -d # Or podman-compose
+    ```
+9.  **Firewall:** Ensure port 3306 is open for Master nodes to connect to MySQL.
+    ```bash
+    # Example for firewalld
+    sudo firewall-cmd --add-port=3306/tcp --permanent
+    sudo firewall-cmd --reload
+    # Example for ufw
+    # sudo ufw allow from <MASTER1_IP> to any port 3306 proto tcp
+    # sudo ufw allow from <MASTER2_IP> to any port 3306 proto tcp
+    # sudo ufw reload
+    ```
+
+### Phase 2: Set up K3s Master Nodes (Repeat for each Master)
+
+1.  **Prerequisites:** Docker/Podman installed.
+2.  **Add Host Entry:** Ensure the LB's DNS name points to the LB's IP in `/etc/hosts`.
+    ```bash
+    sudo -- sh -c "echo '<LB_IP_ADDRESS> ct.ctf.htl-villach.at' >> /etc/hosts"
+    ```
+3.  **Prepare Directory & Environment:**
+    ```bash
+    mkdir ~/k3s && cd ~/k3s
+    # Copy the .env file from the LB host to ~/k3s/ on the master
+    scp <user>@<LB_IP_ADDRESS>:~/loadbalancer/.env .
+    source .env
+    ```
+4.  **Export Datastore Endpoint:** Verify the output looks correct.
+    ```bash
+    export K3S_DATASTORE_ENDPOINT='mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@tcp(${MYSQL_DATABASE_HOST}:${MYSQL_DATABASE_PORT})/${MYSQL_DATABASE}'
+    echo $K3S_DATASTORE_ENDPOINT
+    ```
+5.  **Install K3s Server:** Use the token from `.env`, set the taint, and add the LB's DNS name to the TLS SAN list so agents/kubectl can connect securely via the LB.
+    ```bash
+    curl -sfL https://get.k3s.io | sh -s - server \
+        --token=$K3S_TOKEN \
+        --datastore-endpoint="$K3S_DATASTORE_ENDPOINT" \
+        --node-taint CriticalAddonsOnly=true:NoExecute \
+        --tls-san ct.ctf.htl-villach.at
+    ```
+    *(Run this on the first master. For subsequent masters, run the same command. They will connect to the DB and join the cluster.)*
+
+6.  **Verify Installation (on Master):** Check if the node registers. It might take a minute.
+    ```bash
+    sudo k3s kubectl get nodes
+    ```
+7.  **Configure Rootless `kubectl` Access:**
+    ```bash
+    sudo chmod 644 /etc/rancher/k3s/k3s.yaml
+    # Optional: Change ownership if needed for specific user
+    # sudo chown $(whoami): /etc/rancher/k3s/k3s.yaml
+    ```
+    Now you should be able to run `k3s kubectl ...` without `sudo`.
+
+8.  **(Optional but Recommended for FastAPI):** Modify `k3s.yaml` to point to the *local* API server IP instead of `127.0.0.1`. This allows services running on the master host (like the FastAPI container) to reach the API server via its node IP if needed, although typically they'd use the internal `kubernetes.default.svc` service cluster IP. The original guide modified this for the FastAPI service. Do this on each master, replacing the IP with its *own* IP.
+    ```yaml
+    # Edit /etc/rancher/k3s/k3s.yaml
+    # Find the line starting with 'server:' under 'clusters:'
+    # Change: server: https://127.0.0.1:6443
+    # To:     server: https://<THIS_MASTER_NODE_IP>:6443
+    ```
+
+### Phase 3: Set up K3s Agent Nodes (Repeat for each Agent)
+
+1.  **Prerequisites:** Docker/Podman installed.
+2.  **Add Host Entry:** Ensure the LB's DNS name points to the LB's IP in `/etc/hosts`.
+    ```bash
+    sudo -- sh -c "echo '<LB_IP_ADDRESS> ct.ctf.htl-villach.at' >> /etc/hosts"
+    ```
+3.  **Prepare Directory & Environment:** (Optional, but good practice if you need the token)
+    ```bash
+    mkdir ~/k3s && cd ~/k3s
+    # Copy the .env file from the LB host to ~/k3s/ on the agent
+    scp <user>@<LB_IP_ADDRESS>:~/loadbalancer/.env .
+    source .env
+    ```
+4.  **Install K3s Agent:** Connect to the masters via the Load Balancer URL (`https://ct.ctf.htl-villach.at:6443`) using the shared token.
+    ```bash
+    curl -sfL https://get.k3s.io | K3S_URL=https://ct.ctf.htl-villach.at:6443 K3S_TOKEN=$K3S_TOKEN sh -
+    ```
+
+5.  **Verify (on a Master Node):** Check if the new agent nodes appear.
+    ```bash
+    k3s kubectl get nodes
+    ```
+
+## ⚠️ Tips, Caveats, Troubleshooting
+
+* **DB Connection Failure:** If masters fail to start and logs mention DB connection issues, verify `K3S_DATASTORE_ENDPOINT`, check MySQL user/password/permissions, ensure the DB container is running, and check firewall rules between masters and the LB host (port 3306).
+* **Token Mismatch:** Ensure the *exact* same `K3S_TOKEN` is used during installation of all servers and agents.
+* **TLS Errors (Agent Connection):** If agents fail to connect with TLS errors, verify the LB DNS name (`ct.ctf.htl-villach.at`) was included in the `--tls-san` list during master installation. Check `/etc/hosts` on agents.
+* **Resetting:** If major issues occur, you might need to uninstall K3s (`/usr/local/bin/k3s-uninstall.sh` on masters, `/usr/local/bin/k3s-agent-uninstall.sh` on agents), wipe the database (`DROP DATABASE k3s; CREATE DATABASE k3s;`), potentially clear persistent volumes (`~/loadbalancer/db/*`), and reinstall.
+* **Master Taint:** The `CriticalAddonsOnly=true:NoExecute` taint prevents regular pods from being scheduled on masters. System pods (like CoreDNS, Traefik, Metrics Server) will have tolerations for this.
+
+## 📄 Clear Formatting, Tested Shell/YAML Blocks
+
+Code blocks contain tested commands and configurations. Replace placeholders like `<LB_IP_ADDRESS>`, `<MASTERx_IP_ADDRESS>`, credentials, and hostnames.

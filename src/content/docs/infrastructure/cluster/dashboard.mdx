@@ -1,0 +1,85 @@
+---
+title: Cluster | Dashboard
+description: Setting up Dashboard of the CTF FlagFrenzy Cluster
+---
+
+Some Text
+
+## 🧠 Context and Reasoning
+
+The Kubernetes Dashboard provides a web-based user interface for managing cluster resources. It allows users to get an overview of applications running on the cluster, as well as create or modify individual Kubernetes resources (Deployments, Jobs, DaemonSets, etc.). This guide covers deploying the dashboard and setting up an admin user for access.
+
+## 🧱 Architecture Overview (Placeholder)
+
+*(Placeholder: Show User -> Browser -> SSH Tunnel/Proxy -> K3s Master -> `kubectl proxy` -> Kubernetes API Server -> Dashboard Service/Pods)*
+
+**Access Method:** The dashboard is typically exposed internally within the cluster. Access is usually achieved via `kubectl proxy`, which tunnels traffic from your local machine to the cluster's API server, which can then proxy requests to the dashboard service. An SSH tunnel might be needed if `kubectl proxy` runs on a remote machine (like a K3s master).
+
+## 🛠️ Implementation Steps
+
+1.  **Deploy Dashboard Manifest:** Apply the recommended deployment manifest from the Kubernetes Dashboard project. (Version `v2.0.4` was used in the original guide; check for newer stable versions).
+    ```bash
+    # Run on master or via kubectl
+    # Check for latest version at: https://github.com/kubernetes/dashboard/releases
+    # Example using v2.7.0 (common stable version as of late 2023)
+    kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.7.0/aio/deploy/recommended.yaml
+    ```
+    *(This creates the `kubernetes-dashboard` namespace and related resources)*.
+
+2.  **Create Admin Service Account:** Define a `ServiceAccount` for administrative access.
+    * Create `dashboard.admin-user.yml`:
+        ```yaml
+        apiVersion: v1
+        kind: ServiceAccount
+        metadata:
+          name: admin-user
+          namespace: kubernetes-dashboard
+        ```
+    * Apply the file:
+        ```bash
+        kubectl apply -f dashboard.admin-user.yml
+        ```
+
+3.  **Create Admin ClusterRoleBinding:** Grant the `admin-user` ServiceAccount cluster-wide admin privileges. **Warning:** This provides full control over the cluster. For restricted access, create a more granular Role/RoleBinding.
+    * Create `dashboard.admin-user-role.yml`:
+        ```yaml
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRoleBinding
+        metadata:
+          name: admin-user # Binding name
+        roleRef:
+          apiGroup: rbac.authorization.k8s.io
+          kind: ClusterRole
+          name: cluster-admin # Grant cluster-admin role
+        subjects:
+        - kind: ServiceAccount
+          name: admin-user # ServiceAccount defined above
+          namespace: kubernetes-dashboard # Namespace of the ServiceAccount
+        ```
+    * Apply the file:
+        ```bash
+        kubectl apply -f dashboard.admin-user-role.yml
+        ```
+
+4.  **Get Bearer Token for Login:** Obtain the authentication token associated with the `admin-user` ServiceAccount.
+    ```bash
+    # For Kubernetes v1.24+ (Tokens are no longer auto-generated in secrets)
+    kubectl create token admin-user -n kubernetes-dashboard --duration=8760h # Request a long-lived token (e.g., 1 year)
+
+    # For older Kubernetes versions (before v1.24):
+    # Find the secret associated with the service account
+    # ADMIN_SECRET_NAME=$(kubectl get sa admin-user -n kubernetes-dashboard -o jsonpath="{.secrets[0].name}")
+    # Extract the token from the secret
+    # kubectl get secret $ADMIN_SECRET_NAME -n kubernetes-dashboard -o jsonpath="{.data.token}" | base64 --decode
+    ```
+    *Copy the output token securely. This will be used to log in to the dashboard.*
+
+5.  **Start `kubectl proxy`:** Run this command on the machine where your `kubectl` is configured to access the cluster (e.g., your local machine if `~/.kube/config` points to the cluster, or on a K3s master node). It runs in the foreground.
+    ```bash
+    kubectl proxy
+    # Output: Starting to serve on 127.0.0.1:8001
+    ```
+
+6.  **Access the Dashboard:**
+    * **If `kubectl proxy` runs locally:** Open your browser to the dashboard URL:
+        `http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/

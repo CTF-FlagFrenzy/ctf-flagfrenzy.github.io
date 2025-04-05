@@ -1,0 +1,128 @@
+---
+title: Cluster | Using Podman on the Loadbalancer
+description: Using Podman on the Loadbalancer of the CTF FlagFrenzy Cluster
+---
+
+Some Text
+
+## 🧠 Context and Reasoning
+
+Podman offers a daemonless alternative to Docker, often preferred for its security model (running rootless by default more easily). If you prefer or require Podman instead of Docker on the Load Balancer host (or other nodes where `docker compose` or `podman-compose` is used), this guide outlines the steps to switch.
+
+The primary changes involve installing Podman and `podman-compose`, ensuring the Podman socket is active, and adjusting volume mounts in `docker-compose.yml` files that reference the Docker socket (like Portainer).
+
+## 🧱 Architecture Overview (Placeholder)
+
+*(Placeholder: Briefly mention that Podman manages containers locally on the LB host, similar to Docker, but interacts via a user-specific socket when run rootless.)*
+
+## 🛠️ Implementation Steps
+
+These steps assume you initially had Docker installed and want to switch to Podman. Perform these on the relevant host (e.g., the Load Balancer).
+
+1.  **Disable Docker Service:**
+    Stop and disable the Docker socket and service.
+    ```bash
+    sudo systemctl disable --now docker.service docker.socket
+    ```
+
+2.  **Remove Docker Packages:**
+    Uninstall Docker packages. The exact package names might vary slightly based on installation method (e.g., `docker-ce` vs `docker.io`). Adjust the command as needed.
+    ```bash
+    # Example for packages installed via Docker's repo:
+    sudo apt-get remove -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin docker-ce-rootless-extras
+    # Example for packages from Ubuntu repo:
+    # sudo apt-get remove -y docker.io docker-doc docker-compose podman-docker containerd runc
+    # Clean up any remaining conflicting packages listed in README.md if necessary
+    for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove $pkg; done
+    sudo apt-get autoremove -y
+    ```
+
+3.  **Delete Docker Data (Optional but Recommended for Cleanliness):**
+    ```bash
+    sudo rm -rf /var/lib/docker
+    sudo rm -rf /var/lib/containerd
+    sudo rm -rf /etc/docker
+    rm -rf ~/.docker # User-specific docker config
+    ```
+
+4.  **Install Podman and Podman-Compose:**
+    `podman-docker` provides a `docker` CLI alias for Podman. `podman-compose` requires `pip`.
+    ```bash
+    sudo apt-get update
+    sudo apt-get install -y podman podman-docker uidmap # uidmap needed for rootless
+    # Install pip if not present
+    sudo apt-get install -y python3-pip
+    # Install podman-compose using pip
+    pip3 install podman-compose --user # Install for current user
+    # Or system-wide (might require sudo)
+    # sudo pip3 install podman-compose
+    ```
+    *(Ensure `~/.local/bin` is in your PATH if installed with `--user`)*
+
+5.  **Enable Podman Socket (User Session):**
+    Enable the user-specific Podman socket.
+    ```bash
+    systemctl --user enable --now podman.socket
+    ```
+
+6.  **Enable Linger (Important for Long-Running Services):**
+    To ensure user services (like the Podman socket and containers started via `podman-compose`) continue running after you log out, enable lingering for your user.
+    ```bash
+    sudo loginctl enable-linger $(whoami)
+    ```
+
+7.  **Set `DOCKER_HOST` Environment Variable:**
+    Point tools like `podman-compose` (which often respect `DOCKER_HOST`) to the user Podman socket. Add this to your shell profile (`~/.bashrc`, `~/.zshrc`) for persistence.
+    ```bash
+    export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/podman/podman.sock
+    # Add to ~/.bashrc or similar:
+    # echo 'export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/podman/podman.sock' >> ~/.bashrc
+    # source ~/.bashrc # Apply immediately
+    ```
+
+8.  **Verify Podman:**
+    ```bash
+    podman version
+    podman run hello-world
+    podman-compose version
+    ```
+
+9.  **Adjust `docker-compose.yml` Files:**
+    The most common change needed is updating the Docker socket volume mount, particularly for Portainer.
+    * **Find:** `volumes:` section for services like `portainer`.
+    * **Replace:** `- /var/run/docker.sock:/var/run/docker.sock` (or similar Docker paths)
+    * **With:** `- $XDG_RUNTIME_DIR/podman/podman.sock:/var/run/docker.sock`
+
+    **Example (Portainer on Load Balancer `~/loadbalancer/docker-compose.yml`):**
+    ```yaml
+      portainer:
+        image: portainer/portainer-ce
+        restart: on-failure
+        ports:
+          - 9443:9443
+        volumes:
+          - my-portainer-data:/data
+          # Use the Podman socket path:
+          - $XDG_RUNTIME_DIR/podman/podman.sock:/var/run/docker.sock
+        networks:
+          - my-loadbalancer-net
+    ```
+
+10. **Deploy using `podman-compose`:**
+    Navigate to the directory containing your `docker-compose.yml` (e.g., `~/loadbalancer/`) and use `podman-compose`.
+    ```bash
+    cd ~/loadbalancer
+    podman-compose up --build -d
+    ```
+
+## ⚠️ Tips, Caveats, Troubleshooting
+
+* **Rootless Networking:** Podman's rootless networking differs from Docker's. By default, rootless containers might not be directly accessible from other hosts unless specific ports are published (`-p hostPort:containerPort`). `podman-compose` handles port publishing defined in the YAML. Container-to-container communication within the same pod or on the same Podman network usually works. Consult Podman networking documentation if issues arise.
+* **Socket Path:** Ensure the `DOCKER_HOST` variable and the volume mount path point to the correct Podman socket location (`$XDG_RUNTIME_DIR/podman/podman.sock`).
+* **`podman-compose` Limitations:** While generally compatible, `podman-compose` might not support every Docker Compose feature or syntax nuance. Check the `podman-compose` GitHub page for known issues or differences.
+* **Permissions:** When using rootless Podman with host volume mounts (`driver: local`, `o: bind`), ensure the user running `podman-compose` has appropriate permissions to the host directory being mounted. Podman uses user namespaces, which can affect file ownership inside the container.
+* **Linger:** Forgetting to enable linger is a common reason for services stopping after logout when using rootless Podman with `systemctl --user`.
+
+## 📄 Clear Formatting, Tested Shell/YAML Blocks
+
+Commands and YAML snippets are adapted for Podman usage. Ensure paths and environment variables are set correctly.
