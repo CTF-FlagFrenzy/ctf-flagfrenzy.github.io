@@ -42,30 +42,6 @@ Open your browser and navigate to the URL shown in your terminal after starting 
 - **Dependencies Issues**: If you encounter problems with dependencies, try deleting the `node_modules` folder and the `package-lock.json`, `yarn.lock`, or `pnpm-lock.yaml` file, then run the install command again.
 - **Build Errors**: If you encounter build errors, check the terminal output for specific error messages.
 
-## Development
-
-Astro uses hot module replacement, so most changes will be reflected in the browser without needing to refresh the page.
-
-## Building for Production
-
-To build the site for production:
-
-```bash
-# Using npm
-npm run build
-```
-
-This will generate the production build in the `dist` directory.
-
-## Previewing the Production Build
-
-To preview the production build locally:
-
-```bash
-# Using npm
-npm run preview
-```
-
 ## Deployment
 
 This website is automatically deployed to GitHub Pages when changes are pushed to the main branch, using GitHub Actions.
