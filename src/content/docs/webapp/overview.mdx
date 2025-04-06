@@ -27,6 +27,46 @@ The whole Authentication works with following files:
 
 The most important file is the services.ts because there the Azure communication begins. The Hooks Server is used before every page and checks the authentication. The callback is the file which is linked in Azure.
 
+## Concepts
+These Concepts explain how the Webapp works.
+
+### Backend & Frontend
+![alt text](../../../assets/backend/Webapp_Concept.png)
+
+For a better understanding of the concept, the figure shown above includes following steps:
+- 1. -> user accesses the nginx proxy on port 4443
+- 2. -> nginx redirect to the sveltekit application on port 5173 (Productive 3000)
+- 3. -> sveltekit redirects to the Microsoft authentication
+- 4. -> Microsoft authentication gives the user informations sveltekit
+- 5. -> sveltekit make a request to an API endpoint
+- 6. -> API make a request to the database for the requested information
+- 7. -> database responses with the data from the requested table
+- 8. -> API responses with the data from the requested endpoint and sveltekit the information
+- 9. -> nginx forwards the sveltekit pages to the user via https
+
+### Workflow Challenge start
+![alt text](../../../assets/backend/Challenge_Start.png)
+
+For a better understanding of the concept, the figure shown above includes following steps:
+- a. ->  User is authenticated
+- 1. ->  User start a Challenge
+- 2. ->  Deploy call
+- 3. ->  Response from the container cluster
+- 4. ->  Response from the API
+- 5. ->  User Solve the Challenge
+- 6. ->  API Updates the score and save who the challenge solved
+- 7. ->  API gets the data
+- 8. ->  Web gets the data
+
+### Teams Workflow
+![alt text](../../../assets/backend/Teams_Workflow.png)
+
+This Figure describes the workflow of teams. On the right side it describes how the User creates the team and how it comes in the database. On the left side it describes how a user can join a team. To join a team, it is necessary to have the Teamkey from this team because with that it is possible to create the foreign key for the team. Each team has a maximum of four members.
+
+### API Concept
+![alt text](../../../assets/backend/API_Concept.png)
+This figure describes the concept of the API communication for the Webapp. The client-side requests the API from the server-side, and this makes the real request to the backend API. The response is then sent back to the webpage via the server-side API from svelte. This is necessary because otherwise the container cannot reach each other. 
+
 ## How to run
 The whole webapp can be deployed with one Dockercompose this needs two .env files one in the flagfrenzy-sveltekit and one in the root. The one in the root is important for the database and the API. 
 ```bash
