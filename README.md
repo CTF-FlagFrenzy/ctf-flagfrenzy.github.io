@@ -19,14 +19,12 @@ cd ctf-flagfreny.github.io
 ### Step 2: Install Dependencies
 
 ```bash
-# Using npm
 npm install
 ```
 
 ### Step 3: Start the Development Server
 
 ```bash
-# Using npm
 npm run dev
 ```
 
@@ -35,6 +33,12 @@ This will start the development server, typically at http://localhost:3000 or ht
 ### Step 4: View the Website
 
 Open your browser and navigate to the URL shown in your terminal after starting the development server (usually http://localhost:3000 or http://localhost:4321).
+
+### Step 5: Astro Build (before pushing)
+```bash
+npm run build
+```
+
 
 ### Troubleshooting
 
