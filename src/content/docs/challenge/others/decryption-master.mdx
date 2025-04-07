@@ -1,24 +1,385 @@
 ---
-title: decryption_master
-description: Decryption Master challenge
+title: "CTF Others | Decryption Master: Expert"
+description: Decryption Master Challenge
 ---
 
-# Decryption Master
+This challenge involves finding parts of a ciphertext hidden in various locations, combining them in the correct order, and decrypting them using AES-128 CBC.
 
-## Challenge Description
+#### Directory Structure
 
-[Description of the Decryption Master challenge]
+```
+Decryption_Master/
+├── create_flags.py
+├── decrypt_ciphertext.py
+├── Decryption_Master.md
+├── docker-compose.yml
+├── Dockerfile
+├── rockyou.txt.gz
+└── writeup.md
+```
 
-## Difficulty
+## Technical Implementation
 
-[Easy/Medium/Hard]
+### Architecture
 
-## Hints
+The challenge uses a microservice architecture built with the following components:
 
-1. [Hint 1]
-2. [Hint 2]
-3. [Hint 3]
+1.  **Flag creation** (`create_flag.py`): The first part of the Python script is responsible for generating the flags.
+2.  **Linux Preparation** (`create_flag.py`): The second part of the Python script is responsible for making changes to the Linux system as a blank Ubuntu may not be used.
+3.  **Containerization** (`Dockerfile` and `docker-compose.yml`): Files needed in order to build the image and deploy the Ubuntu container.
 
-## Solution
+### Component 1: Flag creation (`create_flag.py`)
 
-[Solution details to be added]
+Before preparing the Linux system, it is important to create the flags. The first part of the `create_flag.py` script is responsible for generating the them.
+
+#### Full Source Code:
+```python
+import hashlib
+import logging
+import os
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
+
+if __name__ == "__main__":
+    # Flag creation
+    challenge_flag = "j3L2k3'sz\\"
+    challenge_flag_two = "4j*3$9r0Sv"
+    team_flag = os.getenv("TEAMKEY")
+
+    combined_flag = challenge_flag + team_flag
+    combined_flag_two = challenge_flag_two + team_flag
+
+    hashed_flag = hashlib.sha256(combined_flag.encode()).hexdigest()
+    hashed_flag_formatted = "FF{" + hashed_flag + "}"
+    logger.info(f"First flag created (history): {hashed_flag_formatted}")
+
+    hashed_flag_two = ("FF{" + hashlib.sha256(combined_flag_two.encode()).hexdigest() + "}")
+    logger.info(f"Second flag created (AES): {hashed_flag_two}")
+```
+
+#### Key Algorithms:
+
+1.  Flag Generation
+    - Combines a fixed challenge string `j3L2k3'sz\\` and `4j*3$9r0Sv` with a team-specific key
+    - Applies SHA-256 hashing to create a unique flag
+    - Formats it with the `FF{...}` prefix
+2.  Flag Segmentation
+    - The first flag is hidden in a system variable `$SystemNothing`. However, there is also a connection to the second one.
+    - The second flag is used for AES encryption and its ciphertext is seperated into 4 parts, each one hidden in the depths of the Ubuntu system.
+
+### Component 2: Linux Preparation (`create_flag.py`)
+
+Preparing the Linux system for the incoming access is one of the main tasks when deploying the challenge. The second part of the `create_flag.py` script is responsible for making changes to the Linux system.
+
+#### Full Source Code:
+```python
+#!/usr/bin/env python3
+import hashlib
+import logging
+import os
+import subprocess
+import binascii
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad, unpad
+
+# ...AES SubBytes table...
+
+def apply_subbytes(key_bytes):
+    # Apply AES SubBytes transformation to the key.
+    return bytes(SUBBYTES_TABLE[b] for b in key_bytes)
+
+# ...Logger configuration...
+
+if __name__ == "__main__":
+    # Flag creation
+    challenge_flag = "j3L2k3'sz\\"
+    challenge_flag_two = "4j*3$9r0Sv"
+    team_flag = os.getenv("TEAMKEY")
+
+    combined_flag = challenge_flag + team_flag
+    combined_flag_two = challenge_flag_two + team_flag
+
+    hashed_flag = hashlib.sha256(combined_flag.encode()).hexdigest()
+    hashed_flag_formatted = "FF{" + hashed_flag + "}"
+    logger.info(f"First flag created (history): {hashed_flag_formatted}")
+
+    hashed_flag_two = ("FF{" + hashlib.sha256(combined_flag_two.encode()).hexdigest() + "}")
+    logger.info(f"Second flag created (AES): {hashed_flag_two}")
+
+    # AES-128 Encryption (CBC mode)
+    # Extract the first 16 bytes of the hashed flag and apply SubBytes
+    raw_key = bytes.fromhex(hashed_flag_formatted[:16].encode('utf-8').hex()) # 16-byte key)
+    aes_key = apply_subbytes(raw_key)
+
+    logger.info(f"AES key (RAW): {raw_key.hex()}")
+    logger.info(f"AES key (SB): {aes_key.hex()}")
+
+    iv = os.urandom(16) # random IV 
+    iv_new = apply_subbytes(iv)
+
+    # Create the cipher object and encrypt the data
+    cipher = AES.new(aes_key, AES.MODE_CBC, iv)
+    ciphertext = cipher.encrypt(pad(hashed_flag_two.encode('utf-8'), AES.block_size))
+
+    # Convert the ciphertext and IV to hexadecimal format
+    hex_ciphertext = ciphertext.hex()
+    logger.info(f"IV (RAW) = {str((binascii.hexlify(iv)), "utf-8")}")
+    logger.info(f"IV (SB) = {str((binascii.hexlify(iv_new)), "utf-8")}")
+    logger.info(f"Ciphertext = {str((binascii.hexlify(ciphertext)), "utf-8")}")
+
+    # Divide the ciphertext into 4 parts
+    part_size = len(hex_ciphertext) // 4
+    part_a = hex_ciphertext[:part_size]
+    part_b = hex_ciphertext[part_size:2*part_size]
+    part_c = hex_ciphertext[2*part_size:3*part_size]
+    part_d = hex_ciphertext[3*part_size:]
+
+    # ...Further definitions and changes for the Linux system, e.g. fake files, creating files with ciphertext parts, etc...
+
+    # Write the bash script to a file
+    with open("configure_system.sh", "w") as file:
+        file.write(bash_script)
+
+    # Make the bash script executable
+    subprocess.run(["chmod", "+x", "configure_system.sh"])
+
+    # Execute the bash script
+    subprocess.run(["/bin/bash", "./configure_system.sh"])
+
+    # Delete the bash script after execution
+    os.remove("configure_system.sh")
+
+    logger.info(f"Script executed and deleted.")
+```
+#### Key Features:
+
+1.  AES Encryption
+    - The AES key is derived from the first 16 bytes of the first hashed flag and then manipulated using the SubBytes transformation (=permutation).
+    - The IV is generated randomly and also manipulated using the same transformation.
+    - On the Linux system, the non-edited AES-key and edited IV may be found - however, the encryption uses the subbyte-edited version of the AES-key and the non-edited IV.
+2.  Ciphertext handling
+    - The ciphertext is divided into four parts, each hidden in different locations on the system.
+    - The first part is stored in the `/etc/passwd` file.
+    - The second part is hidden in a backup file in `/home/j007/confs/`.
+    - The third part is hidden in the `/usr/share/wordlists/rockyou.txt` file.
+    - The fourth part is hidden in the `/var/log/syslog` file.
+3.  System changes
+    - The script creates fake files and directories to hide the ciphertext parts - plus, the history is manipulated to include the first flag.
+    - All commands are stored in a bash script, which is executed at the end of the script using `subprocess.run()`.
+
+### Component 3: Containerization
+
+The Ubuntu system is running in a container environment in order to fulfill the dynamic environment requirements.
+
+#### Dockerfile (`flask_app/Dockerfile`)
+
+```dockerfile
+FROM ubuntu:latest
+
+COPY ./create_flags.py /root
+
+RUN mkdir /usr/share/wordlists
+COPY ./rockyou.txt.gz /usr/share/wordlists
+
+RUN gunzip /usr/share/wordlists/rockyou.txt.gz && apt update && apt install -y openssh-server python3 python3-pip python3-venv nano
+RUN python3 -m venv /env && /env/bin/pip install pycryptodome
+
+EXPOSE 22
+
+ENTRYPOINT ["/bin/bash", "-c", "useradd -m -s /bin/bash j007 && echo 'j007:'$PASSWORD | chpasswd && source /env/bin/activate && python3 /root/create_flags.py && rm /root/create_flags.py && service ssh start && sleep infinity"]
+```
+
+#### Docker Compose (`docker_compose.yml`)
+
+```yaml
+networks:
+  encrpytion-forensics:
+
+services:
+  ubuntu-ssh:
+    build:
+      context: .
+      dockerfile: Dockerfile
+   
+    ports:
+      - "80:22"
+
+    networks:
+      - encrpytion-forensics
+
+    environment:
+      - TEAMKEY=XXXXXXX
+      - PASSWORD=1234
+```
+#### Containerization Details:
+
+1.  Base image
+    - Use the official `ubuntu:latest` image as a base
+    - Copy the script into the root home directory
+    - Install Python 3 with all its dependencies and SSH server
+    - Create a virtual environment and install the required packages
+2.  Entrypoint
+    - Create a new user `j007` with the password from the environment variable
+    - Start the SSH service
+    - Run the script to create the flags
+    - Remove the script after execution
+    - Keep the container running indefinitely
+    - The container is set to run indefinitely, allowing for SSH access
+3.  Networking / Ports
+    - Map the host port 80 to the container port 22
+    - SSH traffic is handled via port 80
+4.  Environment Variables
+    - **TEAMKEY:** Team-specific key used in flag generation
+    - **PASSWORD:** Password for SSH access
+    - Can be customized for each deployment
+
+**HAVE FUN**
+
+## Challenge Writeup
+
+### Step 1: Retrieve the first flag
+    - Start off with some basic commands, especially `history`
+    - Analyse the history
+    - There are two interesting system variables `$SystemNothing` and `$YouKnowNothing`
+    - However, `$SystemNothing` includes an interesting text plus the first flag.
+    - Hand in the flag using the known flag layout (`FF{...}`).
+
+### Step 2: Locate the Ciphertext parts
+    - The ciphertext is divided into four parts, all hidden in different locations.
+        - Part A
+            - Found in the `passwd` file.
+            - Look for a line like: `u23:x:1002:1002::{part_a}:/clouds/are/wonderful`
+            - Extract part a.
+        - Part B
+            - Found in one of the backup files in `/home/j007/confs/`
+            - You may use the `diff` command.
+            - Specifically, it is inserted into the middle of `backup_42.conf` using the line: `24 rooms are part of: {part_b}`
+            - Extract part b.
+        - Part C
+            - Found in `/usr/share/wordlists/rockyou.txt`
+            - Look for a line like: `30 session are needed for: {part_c}`
+            - Extract part c.
+        - Part D
+            - Found in `/var/log/syslog`
+            - Look for a line like: `100% insanity in HTL Villach leads to: {part_d}`
+            - Extract part d.
+
+### Step 3: Combine the parts
+    - Combine the parts in the correct order.
+    - The used numbers in the lines of the parts indicate the order (e.g. u23 - number 23)
+    - Order from the lowest to the highest number, so: `ciphertext = part_a + part_b + part_c + part_d`
+
+### Step 4: Find the IV used for AES-128-CBC
+    - The Initialization Vector (IV) is stored in `/usr/share/wordlists/rockyou.txt`
+    - Look for a line like: `I must not forget my IV, it is: {hex_iv}`
+    - Extract the IV.
+
+### Step 5: Decrypt the ciphertext using AES-128-CBC
+    - Convert the combined ciphertext from hex to bytes.
+    - Use the AES key (first 16 byte of the first flag) and IV to decrypt the ciphertext.
+    - The AES key is additionally manipulated with S-boxing before usage. This also applies to the IV, however, not the manipulated one (found on ubuntu system) but the original one, which requires a revert of S-boxing, is used for the AES encryption.
+    - Unpad the decrypted data to retrieve the plaintext flag.
+    - In order to achieve this, use the Python script `decrypt_ciphertext.py` to decrypt the ciphertext.
+
+    ```python
+    import base64
+    import hashlib
+    import binascii
+    from Crypto.Cipher import AES
+    from Crypto.Util.Padding import unpad
+
+    # AES SubBytes and Inverse SubBytes tables
+    SUBBYTES_TABLE = [
+        0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
+        0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
+        0xb7, 0xfd, 0x93, 0x26, 0x36, 0x3f, 0xf7, 0xcc, 0x34, 0xa5, 0xe5, 0xf1, 0x71, 0xd8, 0x31, 0x15,
+        0x04, 0xc7, 0x23, 0xc3, 0x18, 0x96, 0x05, 0x9a, 0x07, 0x12, 0x80, 0xe2, 0xeb, 0x27, 0xb2, 0x75,
+        0x09, 0x83, 0x2c, 0x1a, 0x1b, 0x6e, 0x5a, 0xa0, 0x52, 0x3b, 0xd6, 0xb3, 0x29, 0xe3, 0x2f, 0x84,
+        0x53, 0xd1, 0x00, 0xed, 0x20, 0xfc, 0xb1, 0x5b, 0x6a, 0xcb, 0xbe, 0x39, 0x4a, 0x4c, 0x58, 0xcf,
+        0xd0, 0xef, 0xaa, 0xfb, 0x43, 0x4d, 0x33, 0x85, 0x45, 0xf9, 0x02, 0x7f, 0x50, 0x3c, 0x9f, 0xa8,
+        0x51, 0xa3, 0x40, 0x8f, 0x92, 0x9d, 0x38, 0xf5, 0xbc, 0xb6, 0xda, 0x21, 0x10, 0xff, 0xf3, 0xd2,
+        0xcd, 0x0c, 0x13, 0xec, 0x5f, 0x97, 0x44, 0x17, 0xc4, 0xa7, 0x7e, 0x3d, 0x64, 0x5d, 0x19, 0x73,
+        0x60, 0x81, 0x4f, 0xdc, 0x22, 0x2a, 0x90, 0x88, 0x46, 0xee, 0xb8, 0x14, 0xde, 0x5e, 0x0b, 0xdb,
+        0xe0, 0x32, 0x3a, 0x0a, 0x49, 0x06, 0x24, 0x5c, 0xc2, 0xd3, 0xac, 0x62, 0x91, 0x95, 0xe4, 0x79,
+        0xe7, 0xc8, 0x37, 0x6d, 0x8d, 0xd5, 0x4e, 0xa9, 0x6c, 0x56, 0xf4, 0xea, 0x65, 0x7a, 0xae, 0x08,
+        0xba, 0x78, 0x25, 0x2e, 0x1c, 0xa6, 0xb4, 0xc6, 0xe8, 0xdd, 0x74, 0x1f, 0x4b, 0xbd, 0x8b, 0x8a,
+        0x70, 0x3e, 0xb5, 0x66, 0x48, 0x03, 0xf6, 0x0e, 0x61, 0x35, 0x57, 0xb9, 0x86, 0xc1, 0x1d, 0x9e,
+        0xe1, 0xf8, 0x98, 0x11, 0x69, 0xd9, 0x8e, 0x94, 0x9b, 0x1e, 0x87, 0xe9, 0xce, 0x55, 0x28, 0xdf,
+        0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16,
+    ]
+
+    INV_SUBBYTES_TABLE = [
+        0x52, 0x09, 0x6a, 0xd5, 0x30, 0x36, 0xa5, 0x38, 0xbf, 0x40, 0xa3, 0x9e, 0x81, 0xf3, 0xd7, 0xfb,
+        0x7c, 0xe3, 0x39, 0x82, 0x9b, 0x2f, 0xff, 0x87, 0x34, 0x8e, 0x43, 0x44, 0xc4, 0xde, 0xe9, 0xcb,
+        0x54, 0x7b, 0x94, 0x32, 0xa6, 0xc2, 0x23, 0x3d, 0xee, 0x4c, 0x95, 0x0b, 0x42, 0xfa, 0xc3, 0x4e,
+        0x08, 0x2e, 0xa1, 0x66, 0x28, 0xd9, 0x24, 0xb2, 0x76, 0x5b, 0xa2, 0x49, 0x6d, 0x8b, 0xd1, 0x25,
+        0x72, 0xf8, 0xf6, 0x64, 0x86, 0x68, 0x98, 0x16, 0xd4, 0xa4, 0x5c, 0xcc, 0x5d, 0x65, 0xb6, 0x92,
+        0x6c, 0x70, 0x48, 0x50, 0xfd, 0xed, 0xb9, 0xda, 0x5e, 0x15, 0x46, 0x57, 0xa7, 0x8d, 0x9d, 0x84,
+        0x90, 0xd8, 0xab, 0x00, 0x8c, 0xbc, 0xd3, 0x0a, 0xf7, 0xe4, 0x58, 0x05, 0xb8, 0xb3, 0x45, 0x06,
+        0xd0, 0x2c, 0x1e, 0x8f, 0xca, 0x3f, 0x0f, 0x02, 0xc1, 0xaf, 0xbd, 0x03, 0x01, 0x13, 0x8a, 0x6b,
+        0x3a, 0x91, 0x11, 0x41, 0x4f, 0x67, 0xdc, 0xea, 0x97, 0xf2, 0xcf, 0xce, 0xf0, 0xb4, 0xe6, 0x73,
+        0x96, 0xac, 0x74, 0x22, 0xe7, 0xad, 0x35, 0x85, 0xe2, 0xf9, 0x37, 0xe8, 0x1c, 0x75, 0xdf, 0x6e,
+        0x47, 0xf1, 0x1a, 0x71, 0x1d, 0x29, 0xc5, 0x89, 0x6f, 0xb7, 0x62, 0x0e, 0xaa, 0x18, 0xbe, 0x1b,
+        0xfc, 0x56, 0x3e, 0x4b, 0xc6, 0xd2, 0x79, 0x20, 0x9a, 0xdb, 0xc0, 0xfe, 0x78, 0xcd, 0x5a, 0xf4,
+        0x1f, 0xdd, 0xa8, 0x33, 0x88, 0x07, 0xc7, 0x31, 0xb1, 0x12, 0x10, 0x59, 0x27, 0x80, 0xec, 0x5f,
+        0x60, 0x51, 0x7f, 0xa9, 0x19, 0xb5, 0x4a, 0x0d, 0x2d, 0xe5, 0x7a, 0x9f, 0x93, 0xc9, 0x9c, 0xef,
+        0xa0, 0xe0, 0x3b, 0x4d, 0xae, 0x2a, 0xf5, 0xb0, 0xc8, 0xeb, 0xbb, 0x3c, 0x83, 0x53, 0x99, 0x61,
+        0x17, 0x2b, 0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26, 0xe1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0c, 0x7d,
+    ]
+
+    def apply_subbytes(key_bytes):
+        # Apply AES SubBytes transformation to the key.
+        return bytes(SUBBYTES_TABLE[b] for b in key_bytes)
+
+    def apply_inv_subbytes(key_bytes):
+        # Apply AES Inverse SubBytes transformation to the key.
+        return bytes(INV_SUBBYTES_TABLE[b] for b in key_bytes)
+
+    # Retrieve the parts from their respective locations
+    part_a = "..."  # Retrieve from /etc/passwd
+    part_b = "..."  # Retrieve from /home/j007/confs/backup_42.conf
+    part_c = "..."  # Retrieve from /usr/share/wordlists/rockyou.txt
+    part_d = "..."  # Retrieve from /var/log/syslog
+    hex_iv = "..."  # Retrieve from /usr/share/wordlists/rockyou.txt
+
+    # Combine all parts to form the original ciphertext
+    hex_ciphertext = part_a + part_b + part_c + part_d
+
+    # Convert the hexadecimal ciphertext and IV to bytes
+    ciphertext = bytes.fromhex(hex_ciphertext)
+    iv = bytes.fromhex(hex_iv)
+
+    # Use the AES key and IV to decrypt the ciphertext
+    hashed_flag = "FF{...}"  # The hashed flag used to generate the AES key
+    raw_key = bytes.fromhex(hashed_flag[:16].encode('utf-8').hex()) # 16-byte key)
+    aes_key = apply_subbytes(raw_key)  # Reverse SubBytes transformation
+
+    iv_original = apply_inv_subbytes(iv)  # Reverse SubBytes transformation
+    cipher = AES.new(aes_key, AES.MODE_CBC, iv_original)
+    decrypted_padded = cipher.decrypt(ciphertext)
+    decrypted_flag = unpad(decrypted_padded, AES.block_size).decode('utf-8')
+
+    print(f"Ciphertext: {hex_ciphertext}")
+    print(f"Decrypted AES Key: {aes_key}")
+    print(f"Decrypted IV: {iv_original}")
+    print(f"Decrypted Ciphertext: {decrypted_flag}") 
+    ```
+
+### Key Insights
+
+1.  Linux basic commands are a must-have in order to find any information hidden on the system.
+2.  Due to the additional permutation on the AES-key and IV, the decryption process is not straightforward. That's why the challenge is an expert (was a hard before).
+3.  Basic knowledge of the AES algorithm is required (most likely 5th year knowledge).
+
+### Tools Used
+* Basic Linux commands
+* Python (Hashlib, Binascii, PyCryptodome)
+* AES knowledge
+
+### Conclusion
+`Decryption Master` was an excellent challenge that tested a wide range of cryptographic and analytical skills. It required careful exploration of system files, logical thinking to combine ciphertext parts, and a solid understanding of AES-128-CBC decryption.

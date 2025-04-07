@@ -1,24 +1,252 @@
 ---
-title: confused_scripting
-description: Confused Scripting challenge
+title: "CTF Reversing | Confused Scripting: Easy Level"
+description: "A CTF challenge focused on reversing obfuscated Python code with AES encryption"
 ---
 
-# Confused Scripting
+Confused Scripting is a Capture The Flag (CTF) challenge designed to test participants' ability to reverse-engineer obfuscated Python code and decrypt an intercepted encrypted flag. The challenge involves analyzing a dynamically generated Python script that encrypts a flag using AES-CBC mode encryption.
 
-## Challenge Description
+#### Directory Structure
+```
+Confused_Scripting/
+├── script.py
+├── start.sh
+├── docker-compose.yml
+├── writeup.md
+└── confused_scripting.md
+```
 
-[Description of the Confused Scripting challenge]
+## Technical Implementation
 
-## Difficulty
+### Architecture
 
-[Easy/Medium/Hard]
+The challenge uses a microservice architecture built with the following components:
 
-## Hints
+1. **Python Script** (`script.py`): Generates the flag, creates obfuscated encryption code, and serves the challenge.
+2. **Startup Script** (`start.sh`): Runs the Python script and starts the Apache web server.
+3. **Docker Configuration** (`docker-compose.yml`): Sets up the environment with the necessary services and keys.
 
-1. [Hint 1]
-2. [Hint 2]
-3. [Hint 3]
+### Component 1: Python Script (`script.py`)
 
-## Solution
+This script is the core of the challenge. It dynamically generates a flag based on environment variables, creates an obfuscated encryption function, and serves the encrypted flag to participants.
 
-[Solution details to be added]
+#### Key Features:
+
+1. Dynamic flag generation using SHA-256 hashing of combined challenge and team keys
+2. AES-CBC encryption with a random initialization vector (IV)
+3. Function and variable name obfuscation using hashed random words
+4. Web server configuration to serve the obfuscated script
+
+#### Full Source Code:
+
+```python
+import base64
+import hashlib
+import os
+import random
+
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import padding
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+
+team_key = os.getenv("TEAMKEY")
+challenge_key = "1378z4eq3hnfiuaudnsdmasdys.-,."
+combined_flag = challenge_key + team_key
+hashed_flag = f"FF{{{hashlib.sha256(combined_flag.encode()).hexdigest()}}}"
+
+print(f"Flag: {hashed_flag}")
+
+
+# a list of names, that will be hashed and used as names for functions and variables
+words = [
+    "apple",
+    "banana",
+    ...
+    "yumberry",
+    "ziziphus",
+]
+
+EncryptionKey = os.urandom(16)
+
+
+# hash a string, until the first character is a string
+# this is because using a int as a first letter of a function makes python cry
+def create_md5_hash(text):
+    hashed = hashlib.md5(text.encode()).hexdigest()
+    while hashed[0].isdigit():
+        hashed = hashlib.md5(hashed.encode()).hexdigest()
+    return hashed
+
+
+# create a list of hashed words
+words = [create_md5_hash(word) for word in words]
+
+# shuffle the words to ensure that every file is unique
+random.shuffle(words)
+
+
+# the function that is encrypting the flag
+def encrypt_flag(flag, key):
+    iv = os.urandom(16)
+    key = key
+    cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+    padder = padding.PKCS7(algorithms.AES.block_size).padder()
+    padded_flag = padder.update(flag.encode()) + padder.finalize()
+    encryptor = cipher.encryptor()
+    encrypted_flag = encryptor.update(padded_flag) + encryptor.finalize()
+    encrypted_flag_with_iv = base64.b64encode(iv + encrypted_flag).decode()
+    return encrypted_flag_with_iv
+
+
+# the function that is decrypting the flag, used for debug or solution
+def decrypt(encrypted_text, key):
+    encrypted_data = base64.b64decode(encrypted_text)
+    iv = encrypted_data[:16]
+    encrypted_flag = encrypted_data[16:]
+    cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+    decryptor = cipher.decryptor()
+    padded_flag = decryptor.update(encrypted_flag) + decryptor.finalize()
+    unpadder = padding.PKCS7(algorithms.AES.block_size).unpadder()
+    flag = unpadder.update(padded_flag) + unpadder.finalize()
+    return flag.decode()
+
+
+# the encryption function, but converted to be filled with random names
+# for maximum confusion
+strencfunc = f"""
+def {words[0]}({words[1]}, {words[2]}):
+    {words[3]} = {os.urandom(16)}
+    {words[2]} = {EncryptionKey}
+    {words[4]} = Cipher(algorithms.AES({words[2]}.encode()), modes.CBC({words[3]}), backend=default_backend())
+    {words[5]} = padding.PKCS7(algorithms.AES.block_size).padder()
+    {words[6]} = {words[5]}.update({words[1]}.encode()) + {words[5]}.finalize()
+    {words[7]} = {words[4]}.encryptor()
+    {words[8]} = {words[7]}.update({words[6]}) + {words[7]}.finalize()
+    {words[9]} = base64.b64encode({words[3]} + {words[8]}).decode()
+    return {words[9]}
+"""
+
+# the flag but encrypted using the encryption function
+secured_flag = encrypt_flag(hashed_flag, EncryptionKey)
+
+# write all of the script to a file dynamically
+with open("/usr/local/apache2/htdocs/obfuscated.py", "wb") as f:
+    import_statements = """import base64
+import random
+import os
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives import padding
+from cryptography.hazmat.backends import default_backend
+"""
+    hint = f"""\n\n\n\n#The output has been intercepted: {secured_flag}"""
+
+    f.write(import_statements.encode())
+    f.write(strencfunc.encode())
+    f.write(hint.encode())
+
+
+html_content = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Download File</title>
+</head>
+<body>
+    <a href="obfuscated.py" download="obfuscated.py">Download obfuscated.py</a>
+</body>
+</html>
+"""
+
+# Write HTML content to a file
+output_path = "/usr/local/apache2/htdocs/index.html"
+with open(output_path, "w") as file:
+    file.write(html_content)
+
+print(f"HTML file written to {output_path}")
+```
+
+### Component 2: Startup Script (`start.sh`)
+
+This script runs the Python script to generate the dynamic flag and starts the Apache web server.
+
+#### Full Source Code:
+
+```bash
+#!/bin/bash
+
+# Run the Python script
+/usr/local/bin/venv/bin/python /usr/local/bin/script.py
+
+# Start Apache server
+httpd-foreground
+```
+
+### Component 3: Docker Configuration (`docker-compose.yml`)
+
+The Docker configuration sets up the environment with the necessary services and keys for the challenge.
+
+#### Full Source Code:
+
+```yml
+version: '3'
+
+services:
+  web:
+    build: .
+    ports:
+      - '8004:80'
+    environment:
+      - TEAMKEY=team2
+      - CHALLENGEKEY=zK^Qg4Sf82
+```
+
+## Challenge Writeup
+
+### Step 1: Understand the Challenge
+
+The challenge provides an obfuscated Python script that encrypts a flag using AES-CBC encryption. The goal is to reverse-engineer the obfuscated function and decrypt the intercepted output to retrieve the flag.
+
+### Step 2: Analyze the Script
+
+The key is to understand the dynamically generated obfuscated function. The script uses random words that are hashed to create variable and function names. The obfuscated function contains the encryption key and IV hardcoded in it.
+
+### Step 3: Extract the Encryption Key and IV
+
+By analyzing the obfuscated function in `obfuscated.py`, you can identify:
+- The encryption key (hardcoded in the function)
+- The IV (also hardcoded in the function)
+
+### Step 4: Decrypt the Intercepted Output
+
+Using the extracted key and IV, you can decrypt the intercepted output using the following decryption function:
+
+```python
+def decrypt(encrypted_text, key):
+    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+    from cryptography.hazmat.primitives import padding
+    from cryptography.hazmat.backends import default_backend
+    import base64
+
+    encrypted_data = base64.b64decode(encrypted_text)
+    iv = encrypted_data[:16]
+    encrypted_flag = encrypted_data[16:]
+    cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+    decryptor = cipher.decryptor()
+    padded_flag = decryptor.update(encrypted_flag) + decryptor.finalize()
+    unpadder = padding.PKCS7(algorithms.AES.block_size).unpadder()
+    flag = unpadder.update(padded_flag) + unpadder.finalize()
+    return flag.decode()
+```
+
+### Key Insights
+
+1. The flag is dynamically generated by combining a `CHALLENGEKEY` and a `TEAMKEY` and then hashing this combination with SHA-256.
+2. The encryption uses AES in CBC mode with a randomly generated IV and key.
+3. The obfuscation technique uses hashed words as variable names to make the code harder to understand.
+4. The original encryption key and IV are embedded in the obfuscated function.
+
+### Tools Used
+
+* Python 3
+* cryptography library
+* base64 module
+* Docker and Docker Compose for deployment

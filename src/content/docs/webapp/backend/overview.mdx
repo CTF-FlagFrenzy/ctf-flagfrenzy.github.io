@@ -5,7 +5,7 @@ description: Overview of the CTF FlagFrenzy backend implementation
 
 # Backend Architecture
 
-The CTF FlagFrenzy backend provides the API Endpoints that power the platform. 
+The backend of the webapp manages and interacts with the data needed for the frontend. Data such as teams, users, challenges, and completed challenges are stored in the web app’s database. FastAPI is used to access the backend database, and this instance is configured to be accessible only by the web app itself. Users authenticate through the school’s Active Directory, ensuring secure access. The frontend is built using SvelteKit, which provides a reactive and efficient user interface framework.
 
 ## Technology Stack
 
