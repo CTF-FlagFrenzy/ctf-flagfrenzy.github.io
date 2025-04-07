@@ -1,24 +1,145 @@
 ---
-title: time_travelers_hunt
-description: Time Travelers Hunt challenge
+title: CTF OSINT-Challenge | Time Traveler's Hunt: Easy - Medium Level
+description: Time Traveler's Hunt challenge
 ---
 
-# Time Travelers Hunt
+`Time Traveler's Hunt` is a challenge where one has to test their skills concerning websites and its sourcepage as well on how to decrypt things or how to use tools like JohnTheRipper or hashcat.
 
-## Challenge Description
+#### Directory Structure
 
-[Description of the Time Travelers Hunt challenge]
+```
+Time_Travelers_Hunt
+├── media
+│   ├── fullQRcode.png
+│   ├── image-01.png
+│   ├── image-02.png
+│   ├── image-03.png
+│   ├── image-04.png
+│   ├── image-05.png
+│   ├── image-06.png
+│   ├── image-07.png
+│   ├── image-08.png
+│   ├── image-09.png
+│   ├── image-10.png
+│   ├── image-11.png
+│   └── image-12.png
+├── Time_Travelers_Hunt.md
+├── website
+│   ├── css
+│   │   └── styles.css
+│   ├── files
+│   │   └── secretFile.pdf
+│   ├── html
+│   │   ├── about.html
+│   │   ├── blogs
+│   │   │   ├── blog10.html
+│   │   │   ├── blog11.html
+│   │   │   ├── blog12.html
+│   │   │   ├── blog13.html
+│   │   │   ├── blog14.html
+│   │   │   ├── blog15.html
+│   │   │   ├── blog16.html
+│   │   │   ├── blog1.html
+│   │   │   ├── blog2.html
+│   │   │   ├── blog3.html
+│   │   │   ├── blog4.html
+│   │   │   ├── blog5.html
+│   │   │   ├── blog6.html
+│   │   │   ├── blog7.html
+│   │   │   ├── blog8.html
+│   │   │   └── blog9.html
+│   │   ├── congrats.html
+│   │   ├── current.html
+│   │   ├── future.html
+│   │   ├── index.html
+│   │   └── past.html
+│   ├── img
+│   │   ├── image10.gif
+│   │   ├── image11.gif
+│   │   ├── image12.gif
+│   │   ├── image13.gif
+│   │   ├── image14.gif
+│   │   ├── image15.gif
+│   │   ├── image1.gif
+│   │   ├── image2.gif
+│   │   ├── image3.gif
+│   │   ├── image4.gif
+│   │   ├── image5.gif
+│   │   ├── image6.gif
+│   │   ├── image7.gif
+│   │   ├── image8.jpg
+│   │   └── image9.gif
+│   └── js
+│       └── script.js
+├── website.zip
+└── writeup.md
+```
 
-## Difficulty
+## Technical Implementation
 
-[Easy/Medium/Hard]
+### Architecture
 
-## Hints
+This challenge has 3 parts:
 
-1. [Hint 1]
-2. [Hint 2]
-3. [Hint 3]
+    1. Building website
+    2. Deploying website
+    3. Capture website
 
-## Solution
+### Component 1: Building website
 
-[Solution details to be added]
+First the website has to be build. It contains a lot of blogs, where some flags are hidden. Also a secret blog is available and somewhere is a link to download the images for a QR-code and PDF file. All necessary files can be found on the CTF-FlagFrenzy repo.
+
+### Component 2: Deploying website
+
+To get the website published, a hosting service called Cloudflare was used because it was free. In this case another git repo was created containing the website and it then was linked to Cloudflare.
+
+### Component 3: Capture website
+
+To make it possible for the participants to find the real website, fake websites with a link to the real one was captured with archive.org.
+
+**HAVE FUN**
+
+## Challenge Writeup
+
+### Step 1: Page Source
+
+- Go to `archive.org` and search for the provided URL. As one can see there are some captures.
+- Look through them and you can see at the bottom of the page a URL, that says `... realtimemachine. ...`.
+- Test all links that are provided and as soon as you find one that works you have passed the first "test".
+- In one of the captures the first flag is hidden, but you can get it also on the functional website. Inspect the page source and the flag will be found.
+
+### Step 2: Secret Blog & QR-code
+
+- To find a hidden file one has to use `dirbuster`. In this part the goal is to find this hidden file and have a look at the message in it.
+- As shown above the secretblog.html suddenly appears. When visiting this page following clue gets displayed:
+- After downloading the images, they have to be put together like this:
+- After scanning the QR-code a text will appear. It looks like a flag but the text inside FF{} is encrypted.
+- Next thing to do is to try  to let hashcat run over it. Like this the password was cracked rather fast.
+
+### Step 3: Secret file
+
+- When going through the blogs again, a difference can be spotted:
+
+    ![alt text](media/image-09.png)
+
+  - With this link a PDF file can be downloaded. The goal is to get the right password to the file. Inside that file, the flag is hidden.
+
+**2. Crack Password**
+
+- To crack the file get the hash of the file with pdf2john.
+- Afterwards run JohnTheRipper with a wordlist your choice. I used rockyou.txt:
+- Use it to open the PDF file. 
+- In the file there are a lot of random letters, numbers and symbols. To find the flag Strg + F is used.
+
+### Tools Used
+
+* archive.org
+* Kali Linux
+* JohnTheRipper
+* dirbuster
+* Photoshop
+* CyberChef
+
+### Conclusion
+
+In this challenge the participant has to use various tools to get to the goal. It is important to know them, because they're a must in the IT.
