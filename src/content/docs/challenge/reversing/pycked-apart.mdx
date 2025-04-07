@@ -1,24 +1,238 @@
 ---
-title: pycked_apart
+title: "CTF Reversing | "
 description: Pycked Apart challenge
 ---
 
-# Pycked Apart
+#### Directory Structure
+```
+./
+├── build.sh
+├── compose.yml
+├── Dockerfile
+├── encoder.py
+├── encoder.pyc
+├── entry.sh
+├── main.py
+├── Pydetect.md
+├── webroot/
+│   └── index.html
+└── writeup.md
+```
 
-## Challenge Description
+## Technical Implementation
 
-[Description of the Pycked Apart challenge]
+### Architecture
+The challenge consits of four main components:
 
-## Difficulty
+1. **Flag file Generator** (`main.py`): Creates the flag and stores it into the flag file.
+2. **ZIP File Creator** (part of `entry.sh`): Combines the flag file and `encoder.pyc` into one single file.
+3. **Web Server** (part of `entry.sh`): Provides the zip file via a download link.
+4. **Containerization** (`Dockerfile` and `compose.yml`): Ensures consistent deployment.
 
-[Easy/Medium/Hard]
+### Component 1: Flag file Generator (`main.py`)
 
-## Hints
+This component creates:
+- The flag from the teamkey and the challenge key.
+- Writes the flag encoded into its file.
 
-1. [Hint 1]
-2. [Hint 2]
-3. [Hint 3]
+#### Source Code:
 
-## Solution
+`main.py`
+```py
+import base64
+import hashlib
+import os
+import pickle
+import zlib
 
-[Solution details to be added]
+teamkey = os.getenv("TEAMKEY")
+challengekey = "01JEB55RPNPJW08X1GB5SR03DF"
+
+flag = "%s%s" % (challengekey, teamkey)
+flaghash = hashlib.sha256(flag.encode()).hexdigest()
+hashed_flag = "FF{%s}" % flaghash
+
+enc = base64.urlsafe_b64encode(zlib.compress(bytes(hashed_flag, "utf-8")))
+with open("flag", "wb") as f:
+    pickle.dump(enc, f)
+```
+
+#### Key Parts:
+
+1. **Flag Generation**
+   - Concatinates a fixed challenge key `01JEB55RPNPJW08X1GB5SR03DF` with a team specific key.
+   - Hashes the resulting string with SHA-256 to create a unique flag.
+   - Adds the `FF{...}` format used for flags.
+
+### Component 2: Zip File Creator (part of `entry.sh`):
+
+This component creates a ZIP file from the flag file and the pre-existing `encoder.pyc` file.
+
+#### Source Code
+
+`build.sh`
+```sh
+#!/usr/bin/env bash
+
+apt update
+apt install zip -y
+```
+
+
+`entry.sh` (Partial)
+```sh
+zip solveme.zip encoder.pyc flag
+```
+
+
+### Component 3: Web Server (part of `entry.sh`)
+
+This component presents the challenge as a downloadable file.
+
+#### Source Code
+
+`entry.sh` (Partial)
+```sh
+mv solveme.zip ./webroot/solveme.zip
+
+cd webroot
+python3 -m http.server 80
+```
+
+`webroot/index.html`
+```html
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Download</title>
+    </head>
+    <body>
+        <h1><a href="solveme.zip">Download (solveme.zip)</a></h1>
+    </body>
+</html>
+```
+
+
+### Component 4: Containerization
+
+The challenge is containerized using Docker for easy deployment and isolation.
+
+`Dockerfile`
+```Dockerfile
+FROM python:3.12
+
+COPY . c
+WORKDIR /c
+
+RUN bash build.sh
+
+EXPOSE 80
+
+ENTRYPOINT [ "bash", "entry.sh" ]
+```
+
+`compose.yml`
+```yml
+version: '3'
+services:
+  python:
+    build: .
+    ports:
+      - '80:80'
+    environment:
+      - TEAMKEY=TeamKey
+      - CHALLENGEKEY=01JEB55RPNPJW08X1GB5SR03DF
+```
+
+`build.sh`
+```sh
+#!/usr/bin/env bash
+
+apt update
+apt install zip -y
+```
+
+`entry.sh`
+```sh
+#!/usr/bin/env bash
+
+python3 main.py
+
+zip solveme.zip encoder.pyc flag
+mv solveme.zip ./webroot/solveme.zip
+
+cd webroot
+python3 -m http.server 80
+```
+
+#### Container Design:
+
+1. **Base Image**
+   - Uses Python 3.12 as the foundation
+   - Provides a minimal but complete runtime environment
+
+2. **Environment Variables**
+   - TEAMKEY: Team-specific key used in flag generation
+   - Can be customized for each deployment
+
+3. **Networking**
+   - Exposes port 80 for web traffic
+
+**HAVE FUN**
+
+## Challenge Writeup
+
+### Step 1: Download the challenge Files
+Download the file called `solveme.zip`
+
+### Step 2: Examine the challenge
+Examining the challenge reveales:
+- The two files, one just simply called `flag`, and one called `encoder.pyc`. 
+- The `flag` file does not contain a plaintext version of the flag. 
+- The `encoder.pyc` has beed used to obfuscate the flag. 
+
+### Step 3: Decompile the `encoder.pyc`
+Decompiling the `encoder.pyc` is necessary, to find out what logic was used to hide the flag. 
+Decompiling compiled python scripts can be achieved with tools such as `pycdc`.
+- Decompile the Python script
+
+```sh
+./pycdc.x86_64 encoder.pyc 
+```
+
+```py
+# Source Generated with Decompyle++
+# File: encoder.pyc (Python 3.7)
+
+import pickle
+import zlib
+from base64 import urlsafe_b64encode as b64enc
+flag = open('flag.txt', 'r').read()
+enc = b64enc(zlib.compress(bytes(flag, 'utf-8')))
+with open('flag', 'wb') as f:
+    pickle.dump(enc, f)
+```
+
+### Step 4: Reverse the Script Logic
+
+Reverse the Logic of the script and write a script to retreive the flag.
+
+```py
+import zlib
+import pickle
+from base64 import urlsafe_b64decode as b64dec
+
+with open('flag', 'rb') as f:
+    data = pickle.load(f)
+
+    compressed_flag = b64dec(data)
+    flag = zlib.decompress(compressed_flag)
+    print(flag)
+```
+
+### Step 5: Run the script
+
+```sh
+python3 decoder.py 
+b'FF{4513918b5f589743e0b168ff185d289760bdc96831a0b548896bfa4111895f3c}'
+```
