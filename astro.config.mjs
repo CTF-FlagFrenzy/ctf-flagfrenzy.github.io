@@ -113,7 +113,7 @@ export default defineConfig({
               items: [
                 { label: 'Reversing | Confused Scripting', link: '/challenge/reversing/confused-scripting' },
                 { label: 'Reversing | Mental Overflow', link: '/challenge/reversing/mental-overflow' },
-                { label: 'Reversing | Shell Assembly', link: '/challenge/reversing/shell-assembly' },
+                { label: 'Reversing | Corrupted File', link: '/challenge/reversing/corrupted-file' },
                 { label: 'Reversing | PYCked Apart', link: '/challenge/reversing/pycked-apart' },
               ]
             },
