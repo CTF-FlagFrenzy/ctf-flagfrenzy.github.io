@@ -83,6 +83,8 @@ export default defineConfig({
               label: 'Anti Cheat',
               items: [
                 { label: 'Anti Cheat | Overview', link: '/webapp/anti-cheat/overview' },
+                { label: 'Anti Cheat | Database', link: '/webapp/anti-cheat/database' },
+                { label: 'Anti Cheat | API', link: '/webapp/anti-cheat/api' },
               ]
             },
 					],
