@@ -62,6 +62,10 @@ export default defineConfig({
               items: [
                 { label: 'Frontend | Overview', link: '/webapp/frontend/overview' },
                 { label: 'Frontend | Authentication', link: '/webapp/frontend/authentication' },
+                { label: 'Frontend | Layout & Index Page', link: '/webapp/frontend/layout-index-page' },
+                { label: 'Frontend | Challenge Page', link: '/webapp/frontend/challenge-page' },
+                { label: 'Frontend | Scoreboard Page', link: '/webapp/frontend/scoreboard-page' },
+                { label: 'Frontend | Team & Profile Page', link: '/webapp/frontend/team-profile-page' },
 
               ]
             },
