@@ -74,3 +74,14 @@ These Endpoints are very important to communicate with the cluster. It sends the
 |----------|--------|-------------|----------|
 | `/deploy/{user_id}/{challenge_id}` | GET | Retrieve the Kubernetes output and create a pod in the cluster. | `Stdout: "Url//https://containerUrl.at"` |
 | `/deprovision/{user_id}/{challenge_id}` | POST | Deprovision a specific pod and delete the entry in the user-made-challenge table. | `{ "detail": "Deprovisioning successful" }` |
+
+## Important Functions
+This FastAPI application periodically inserts team points into a database, but only on specific allowed dates and times.
+
+- The function is_not_allowed_time() checks if the current date is March 20, 2026 and if the current time is between 09:00 and 15:00 (Vienna time).
+
+- On startup, the app launches a background task (background_task()) that checks every 10 minutes whether it’s the right time/date, and if so, calls insert_teampoints() to save team points.
+
+- IP-based access control is prepared (but currently commented out) using IPFilterMiddleware.
+
+- CORS is enabled for all origins.
