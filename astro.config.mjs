@@ -61,12 +61,18 @@ export default defineConfig({
               label: 'Frontend',
               items: [
                 { label: 'Frontend | Overview', link: '/webapp/frontend/overview' },
+                { label: 'Frontend | Authentication', link: '/webapp/frontend/authentication' },
+
               ]
             },
             {
               label: 'Backend',
               items: [
                 { label: 'Backend | Overview', link: '/webapp/backend/overview' },
+                { label: 'Backend | API', link: '/webapp/backend/api' },
+                { label: 'Backend | Database', link: '/webapp/backend/database' },
+
+
               ]
             },
             {
