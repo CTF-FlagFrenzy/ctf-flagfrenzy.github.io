@@ -15,17 +15,6 @@ The CTF FlagFrenzy web application is the primary interface for users interactin
 - Team management
 - Administrative controls and monitoring
 
-## Authentication 
-The Authentication is made with Azure. For this purpose, a separate app was created in Azure and Svelte contacts this and registers the user with Azure. Important is the .env file in the flagfrenzy-sveltekit folder. This file includes all Azure variables.
-![alt text](../../../assets/backend/Azure.png)
-
-The whole Authentication works with following files:
-- flagfrenzy-sveltekit/src/hooks.server.ts
-- flagfrenzy-sveltekit/src/routes/callback/server.ts
-- flagfrenzy-sveltekit/lib/auth/config.ts
-- flagfrenzy-sveltekit/lib/auth/services.ts
-
-The most important file is the services.ts because there the Azure communication begins. The Hooks Server is used before every page and checks the authentication. The callback is the file which is linked in Azure.
 
 ## Concepts
 These Concepts explain how the Webapp works.
