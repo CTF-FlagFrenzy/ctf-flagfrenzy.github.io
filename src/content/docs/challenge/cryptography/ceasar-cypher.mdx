@@ -1,24 +1,232 @@
 ---
-title: ceasar_cypher
-description: Ceasar Cypher challenge
+title: "CTF Reversing | Caesar Cipher: Easy"
+description: An introductory cryptography challenge using Caesar cipher
 ---
 
-# Ceasar Cypher
+Caesar Cipher is a Capture The Flag (CTF) challenge designed to test participants' ability to decode encrypted text using a simple substitution cipher. The challenge involves a web server that displays an encrypted flag that participants need to decrypt.
 
-## Challenge Description
+#### Directory Structure
 
-[Description of the Ceasar Cypher challenge]
+```
+Caesar_Cipher/
+├── Dockerfile
+├── docker-compose.yml
+├── script.py
+├── start.sh
+└── requirements.txt
+```
 
-## Difficulty
+## Technical Implementation
 
-[Easy/Medium/Hard]
+### Architecture
 
-## Hints
+The challenge uses a simple architecture built with the following components:
 
-1. [Hint 1]
-2. [Hint 2]
-3. [Hint 3]
+1.  **Web Server** (`Dockerfile`, `docker-compose.yml`): Apache HTTP server to display the encrypted flag.
+2.  **Flag Generator** (`script.py`): Python script that generates and encrypts the flag.
+3.  **Startup Script** (`start.sh`): Shell script that sets up the environment and starts the services.
 
-## Solution
+### Component 1: Flag Generator (`script.py`)
 
-[Solution details to be added]
+This Python script generates a team-specific flag by combining a predefined challenge key with a team-specific key from environment variables. The flag is then encrypted using a Caesar cipher with a random shift between 1 and 25.
+
+#### Full Source Code:
+
+```python
+#!/usr/bin/env python3
+import hashlib
+import os
+import random
+
+from dotenv import load_dotenv
+
+print("Running startup script...")
+
+
+load_dotenv()
+
+team_key = os.getenv("TEAMKEY")
+challenge_key = "CeaserusCipherusRichtigus"
+combined_flag = challenge_key + team_key
+hashed_flag = f"FF{{{hashlib.sha256(combined_flag.encode()).hexdigest()}}}"
+print(f"Team Key: {team_key}")
+print(f"Challenge Key: {challenge_key}")
+print(f"Flag: {hashed_flag}")
+
+print("Running startup script...")
+# Add your startup logic here
+
+
+def caesar_cipher(text, shift):
+    """
+    Encrypts a string using the Caesar cipher.
+
+    Parameters:
+    text (str): The input string to be encrypted.
+    shift (int): The number of positions to shift each character.
+
+    Returns:
+    str: The encrypted string.
+    """
+    encrypted_text = []
+
+    for char in text:
+        if char.isalpha():
+            # Determine if the character is uppercase or lowercase
+            start = ord("A") if char.isupper() else ord("a")
+            # Shift the character and wrap around using modulo
+            encrypted_char = chr((ord(char) - start + shift) % 26 + start)
+            encrypted_text.append(encrypted_char)
+        else:
+            # Non-alphabetic characters are added as is
+            encrypted_text.append(char)
+
+    return "".join(encrypted_text)
+
+
+random_shift = random.randint(1, 25)
+
+# Example usage
+encrypted_text = caesar_cipher(hashed_flag, shift=random_shift)
+
+
+html_content = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flag</title>
+</head>
+<body>
+    <h1>Some weird text has been found: {encrypted_text}</h1>
+</body>
+</html>
+"""
+
+# Write HTML content to a file
+output_path = "/usr/local/apache2/htdocs/index.html"
+with open(output_path, "w") as file:
+    file.write(html_content)
+
+print(f"HTML file written to {output_path}")
+```
+
+#### Key Features:
+
+1.  Flag generation using a combination of challenge key and team key
+2.  Caesar cipher encryption with random shift
+3.  HTML generation for displaying the encrypted flag
+
+### Component 2: Docker Environment (`Dockerfile`, `docker-compose.yml`)
+
+These files set up the container environment for running the challenge.
+
+#### Full Source Code:
+
+Docker Compose:
+```yml
+version: '3'
+
+services:
+  web:
+    build: .
+    ports:
+      - '7070:80'
+    environment:
+      - TEAMKEY=team1
+      - CHALLENGE=heheheha
+```
+
+Dockerfile:
+```Dockerfile
+FROM httpd:latest
+
+# Install Python
+RUN apt-get update && apt-get install -y python3
+
+# Copy the startup script and Python script
+COPY ./start.sh /usr/local/bin/start.sh
+COPY ./script.py /usr/local/bin/script.py
+COPY ./requirements.txt /usr/local/bin/requirements.txt
+# Make the startup script executable
+RUN chmod +x /usr/local/bin/start.sh
+
+# Set the entrypoint to the startup script
+ENTRYPOINT ["/usr/local/bin/start.sh"]
+
+EXPOSE 80
+```
+
+#### Key Features:
+
+1.  Base image: Apache HTTP server
+2.  Environment setup for Python
+3.  Port mapping and environment variables configuration
+
+### Component 3: Startup Script (`start.sh`)
+
+This shell script creates a Python environment, runs the flag generation script, and starts the web server.
+
+#### Startup Script Code:
+
+```sh
+#!/bin/bash
+
+# Update package list and install python3-venv if not already installed
+apt-get update && apt-get install -y python3-venv
+
+# Create a virtual environment
+python3 -m venv /usr/local/bin/venv
+
+# Activate the virtual environment
+source /usr/local/bin/venv/bin/activate
+
+# Install required packages
+pip install -r /usr/local/bin/requirements.txt
+
+# Run the Python script
+python /usr/local/bin/script.py
+
+# Start Apache server
+httpd-foreground
+```
+
+#### Key Details:
+
+1.  Sets up a Python virtual environment
+2.  Installs required dependencies
+3.  Executes the flag generation script
+4.  Starts the Apache HTTP server
+
+**HAVE FUN**
+
+## Challenge Writeup
+
+### Step 1: Access the Challenge Webpage
+
+Navigate to the challenge URL (running on port 7070) to view the encrypted text.
+
+### Step 2: Identify the Encryption Method
+
+Recognize that the text is encrypted using a Caesar cipher, as indicated by the challenge name.
+
+### Step 3: Decrypt the Text
+
+Use a Caesar cipher decoder to try all possible shifts (1-25) to decrypt the text. This can be done manually or using online tools like [dcode.fr](https://www.dcode.fr/caesar-cipher).
+
+### Step 4: Submit the Flag
+
+The decrypted text will reveal the flag in the format `FF{hashedFlag}`. Submit this flag to complete the challenge.
+
+### Key Insights
+
+1.  The Caesar cipher is a simple substitution cipher where each letter is shifted by a fixed number of positions.
+2.  Non-alphabetic characters remain unchanged during encryption.
+3.  The flag format `FF{hashedFlag}` helps confirm when the correct shift has been found.
+
+### Tools Used
+
+* Web browser
+* Caesar cipher decoder (online tool or script)
+* Basic understanding of substitution ciphers

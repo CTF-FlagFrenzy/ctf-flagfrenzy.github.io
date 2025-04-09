@@ -1,0 +1,305 @@
+---
+title: Cluster | FastAPI Endpoints
+description: Creating the FastAPI Endpoints of the CTF FlagFrenzy Cluster
+---
+
+Some Text
+
+## 🧠 Context and Reasoning
+
+This component provides the HTTP API interface for managing challenge deployments. It's a Python FastAPI application running in a container on the K3s master nodes. It listens for requests, validates them, executes backend scripts (`deploy.sh`, `deprovision.sh`, `teamkey.sh`), and returns results.
+
+## 🧱 Architecture Overview (Placeholder)
+
+*(Placeholder: Focus on the FastAPI container: Receives HTTP request -> Python code validates & calls subprocess -> Subprocess runs bash script -> Returns HTTP response)*
+
+## 🛠️ Implementation Steps
+
+These steps are performed on the K3s Master nodes where the API service will run.
+
+1.  **Create Project Directory Structure:**
+    ```bash
+    # Run on each master node
+    mkdir -p ~/fastapi-deployment-api/app
+    cd ~/fastapi-deployment-api
+    # Place scripts and templates (from cluster/challenge-deployment.mdx) into ./app/
+    # E.g., cp /path/to/deploy.sh ./app/
+    touch app/main.py app/deployment.yml app/ingress.yml app/deploy.sh app/deprovision.sh app/teamkey.sh
+    touch Dockerfile docker-compose.yml .env k3s.yaml # Create empty files first
+    ```
+    **Final Structure:**
+    ```
+    ~/fastapi-deployment-api/
+    ├── app/
+    │   ├── deployment.yml
+    │   ├── deploy.sh
+    │   ├── deprovision.sh
+    │   ├── ingress.yml
+    │   ├── main.py        # FastAPI code
+    │   └── teamkey.sh
+    ├── docker-compose.yml # Service definition
+    ├── Dockerfile         # Container build instructions
+    ├── .env               # API Key
+    └── k3s.yaml           # Kubeconfig for kubectl
+    ```
+
+2.  **Create `app/main.py` (FastAPI Application):**
+    ```python
+    from fastapi import FastAPI, HTTPException, Header, status
+    from pydantic import BaseModel
+    import subprocess
+    import os
+    import logging
+
+    # Configure logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+
+    app = FastAPI()
+
+    # --- Security ---
+    # Load API Key from environment variable. Use a default for local testing ONLY.
+    API_KEY = os.getenv("API_KEY")
+    if not API_KEY:
+        logger.error("API_KEY environment variable not set. Service will not be secure.")
+        # Set a default insecure key to allow startup, but log error.
+        # In production, you might want to raise an Exception here to prevent startup.
+        API_KEY = "default_insecure_key_for_startup_only"
+
+
+    async def verify_api_key(authorization: str = Header(None)):
+        """Dependency to verify the Bearer token."""
+        if not API_KEY or API_KEY == "default_insecure_key_for_startup_only":
+             logger.error("Attempted access when API_KEY is not securely configured.")
+             raise HTTPException(
+                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                 detail="Service not securely configured."
+             )
+
+        if authorization is None:
+            logger.warning("Missing Authorization header")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authorization header missing"
+            )
+        scheme, _, token = authorization.partition(' ')
+        if scheme.lower() != 'bearer' or token != API_KEY:
+            logger.warning(f"Invalid token received. Scheme: {scheme}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication credentials"
+            )
+        return True # Indicate success
+
+    # --- Request Models ---
+    class ChallengeRequest(BaseModel):
+        teamid: str
+        challenge: str
+
+    class SecretRequest(BaseModel):
+        teamid: str
+        teamkey: str # Consider security implications of sending keys via API
+
+    # --- Helper Function to Run Scripts ---
+    def run_script(command: list, script_name: str):
+        """Runs a script using subprocess and handles output/errors."""
+        logger.info(f"Running command: {' '.join(command)}")
+        try:
+            # Ensure script path is correct (relative to WORKDIR in Dockerfile)
+            script_path = os.path.join("/app", script_name)
+            full_command = ["/bin/bash", script_path] + command[2:] # Get args only
+
+            result = subprocess.run(
+                full_command,
+                capture_output=True,
+                text=True,
+                check=False, # Don't raise exception on non-zero exit code here
+                cwd="/app" # Ensure script runs from the app directory
+            )
+            logger.info(f"Script {script_name} exited with code: {result.returncode}")
+            logger.debug(f"Script {script_name} STDOUT: {result.stdout.strip()}")
+            if result.returncode != 0:
+                logger.error(f"Script {script_name} STDERR: {result.stderr.strip()}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Script execution failed: {result.stderr.strip()}"
+                )
+            return result.stdout.strip()
+
+        except FileNotFoundError:
+             logger.exception(f"Script file not found: {script_path}")
+             raise HTTPException(status_code=500, detail=f"Script file not found: {script_name}")
+        except Exception as e:
+            logger.exception(f"Error running script {script_name}: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    # --- API Endpoints ---
+    @app.post("/deploy")
+    async def deploy_service(request: ChallengeRequest, authorized: bool = Depends(verify_api_key)):
+        command = ["/bin/bash", "./deploy.sh", request.teamid, request.challenge]
+        output = run_script(command, "deploy.sh")
+        try:
+            # Attempt to parse URL from script output
+            service_url = [line for line in output.splitlines() if line.startswith("https://")][0]
+            return {"message": "Deployment successful", "url": service_url}
+        except IndexError:
+            logger.error(f"Could not parse service URL from deploy script output: {output}")
+            return {"message": "Deployment script ran, but URL not found in output", "output": output}
+
+
+    @app.post("/deprovision")
+    async def deprovision_service(request: ChallengeRequest, authorized: bool = Depends(verify_api_key)):
+        command = ["/bin/bash", "./deprovision.sh", request.teamid, request.challenge]
+        output = run_script(command, "deprovision.sh")
+        # Simple success message, could parse script output for more detail
+        return {"message": "Deprovision successful", "details": {"team": request.teamid, "challenge": request.challenge}, "output": output}
+
+
+    @app.post("/teamkey")
+    async def create_teamkey_service(request: SecretRequest, authorized: bool = Depends(verify_api_key)):
+        # WARNING: Sending team keys directly in API calls is generally insecure.
+        # Consider alternative methods like generating keys server-side if possible.
+        command = ["/bin/bash", "./teamkey.sh", request.teamid, request.teamkey]
+        output = run_script(command, "teamkey.sh")
+        try:
+             # Attempt to parse confirmation from script output
+            details = [line for line in output.splitlines() if line.startswith("TEAMKEY")][0]
+            return {"message": "Secret Creation successful", "details": details}
+        except IndexError:
+            logger.error(f"Could not parse confirmation from teamkey script output: {output}")
+            return {"message": "Teamkey script ran, but confirmation not found in output", "output": output}
+
+    # --- Root Endpoint for Health Check ---
+    @app.get("/")
+    async def root():
+        return {"message": "FastAPI Deployment Service Running"}
+
+    # --- Add Dependencies to Endpoints ---
+    # (FastAPI v0.100+ recommends using Annotated for Depends)
+    # Example for older versions shown above, or use:
+    # from typing import Annotated
+    # async def deploy_service(request: ChallengeRequest, authorized: Annotated[bool, Depends(verify_api_key)]): ...
+    # Update: Added Depends directly to function signature for simplicity here.
+
+    # --- Uvicorn Entry Point (if running directly, not needed for Docker CMD) ---
+    # if __name__ == "__main__":
+    #     import uvicorn
+    #     uvicorn.run(app, host="0.0.0.0", port=8080)
+    ```
+    *(Added logging, API key verification dependency, basic health check, script execution helper, improved error handling and output parsing)*
+
+3.  **Create `Dockerfile`:**
+    ```Dockerfile
+    # Use an official Python slim image
+    FROM python:3.10-slim
+
+    # Install dependencies: gettext for envsubst, curl for testing/healthchecks? bash is usually included
+    # Install kubectl separately for controlled version
+    RUN apt-get update && \
+        apt-get install -y --no-install-recommends gettext curl ca-certificates gnupg && \
+        rm -rf /var/lib/apt/lists/*
+
+    # Install kubectl (example using Google Cloud SDK repo method for stability)
+    RUN curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.28/deb/Release.key | \
+        gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg && \
+        echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.28/deb/ /' | \
+        tee /etc/apt/sources.list.d/kubernetes.list && \
+        apt-get update && \
+        apt-get install -y kubectl && \
+        rm -rf /var/lib/apt/lists/*
+
+    # Set working directory in the container
+    WORKDIR /app
+
+    # Copy application files (scripts, templates, python code)
+    COPY ./app /app
+
+    # Install Python dependencies
+    RUN pip install --no-cache-dir fastapi "uvicorn[standard]" pydantic python-dotenv # Added python-dotenv to potentially load .env if needed by app itself
+
+    # Make scripts executable
+    RUN chmod +x /app/deploy.sh /app/deprovision.sh /app/teamkey.sh
+
+    # Expose the port the app runs on
+    EXPOSE 8080
+
+    # Define user to run as (optional but good practice)
+    # RUN useradd -ms /bin/bash appuser
+    # USER appuser
+    # Ensure kubeconfig mount destination is accessible by this user if used
+
+    # Command to run the application using uvicorn
+    # Use --reload for development only
+    CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+    ```
+    *(Added kubectl installation, made scripts executable)*
+
+4.  **Create `.env` File:** Store the API key. **Use a strong, unique key.**
+    ```env
+    # ~/fastapi-deployment-api/.env
+    API_KEY=YourSuperSecretAndUniqueApiKeyGoesHere # CHANGE THIS
+    ```
+
+5.  **Copy Kubeconfig:** Copy the K3s config file to the project directory. This file grants cluster access. Ensure it has the correct permissions (consider using the dedicated `deployer` service account kubeconfig if RBAC is set up).
+    ```bash
+    # On the master node
+    # Option 1: Use admin kubeconfig (less secure)
+    sudo cp /etc/rancher/k3s/k3s.yaml ~/fastapi-deployment-api/k3s.yaml
+    sudo chown $(whoami): $(whoami) ~/fastapi-deployment-api/k3s.yaml # Ensure readable by user running compose
+    # Option 2: Use dedicated deployer kubeconfig (more secure, requires RBAC setup)
+    # Ensure /etc/rancher/k3s/deployer-kubeconfig.yaml was created as per Cluster-Webapp-Interaction.md
+    # sudo cp /etc/rancher/k3s/deployer-kubeconfig.yaml ~/fastapi-deployment-api/k3s.yaml
+    # sudo chown $(whoami): $(whoami) ~/fastapi-deployment-api/k3s.yaml
+    ```
+
+6.  **Create `docker-compose.yml`:** Define the FastAPI service.
+    ```yaml
+    # ~/fastapi-deployment-api/docker-compose.yml
+    version: '3.8'
+
+    services:
+      deployment-api:
+        build: . # Build from Dockerfile in current directory
+        container_name: fastapi-deployment-api # Renamed for clarity
+        ports:
+          - "8080:8080" # Map host port 8080 to container port 8080
+        restart: always
+        env_file:
+          - .env # Load API_KEY from .env file
+
+        volumes:
+          # Mount the app directory for potentially easier script updates (remove for production build image)
+          - ./app:/app
+          # Mount the kubeconfig file into the default location kubectl uses
+          # Ensure the source file (./k3s.yaml) exists and is the correct config
+          - ./k3s.yaml:/root/.kube/config:ro # Mount as read-only
+          # Note: If running container as non-root user, mount to /home/appuser/.kube/config
+
+        # Optional: Add healthcheck
+        # healthcheck:
+        #   test: ["CMD", "curl", "--fail", "http://localhost:8080/"] # Check root endpoint
+        #   interval: 30s
+        #   timeout: 10s
+        #   retries: 3
+    ```
+    *(Removed kubectl binary mount as it's now built into the image. Ensured kubeconfig mount.)*
+
+7.  **Deploy the Service:** (Run on each master node)
+    ```bash
+    cd ~/fastapi-deployment-api
+    docker compose up --build -d
+    # Or podman-compose up --build -d
+    ```
+
+## ⚠️ Tips, Caveats, Troubleshooting
+
+* **API Key Security:** The `API_KEY` is crucial for security. Store it securely, do not commit `.env` to Git. Use the `Authorization: Bearer <key>` header when calling the API.
+* **Kubeconfig Permissions:** The mounted `k3s.yaml` determines what the service can do in the cluster. Using the admin config is powerful but risky. Setting up RBAC with a dedicated ServiceAccount (`deployer`) and mounting its specific kubeconfig is recommended (see `cluster/secrets.mdx` and the RBAC steps in `Cluster-Webapp-Interaction.md`). If using RBAC, ensure the Role/ClusterRole bound to the ServiceAccount grants permissions in the target namespaces (`namespace-team-*`).
+* **File Paths:** Ensure paths in the `Dockerfile` (`COPY ./app /app`), `docker-compose.yml` (volumes), and `main.py` (`subprocess` calls) are consistent.
+* **Script Execution:** The FastAPI app runs scripts using `/bin/bash`. Ensure scripts have execute permissions (`chmod +x`).
+* **Logging:** Check the container logs (`docker logs fastapi-deployment-api`) for errors from FastAPI or the scripts. Enhanced logging was added to `main.py`.
+* **Security Context:** Consider running the container as a non-root user (`USER appuser` in Dockerfile) for better security, but ensure the user can access the mounted kubeconfig and execute scripts.
+
+## 📄 Clear Formatting, Tested Shell/YAML Blocks
+
+Code blocks provide the necessary configurations. Adapt paths, keys, and potentially user settings as required.

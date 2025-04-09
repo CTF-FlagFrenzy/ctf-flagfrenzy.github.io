@@ -1,0 +1,59 @@
+---
+title: API
+description: Overview of the CTF FlagFrenzy API implementation
+---
+
+
+The API provides endpoints to handle flag validation, detect shared flags, calculate points dynamically, and manage flagged activities through the admin panel. These endpoints ensure fair play and provide tools for administrators to monitor and manage the competition effectively.
+
+## Technology Stack
+
+- FastAPI  
+- Python  
+
+## API Endpoints
+
+### Anti-Cheat
+These endpoints handle the validation of flag submissions, including checks for dynamic flags, shared flags, and duplicate submissions.
+
+| Endpoint | Method | Description | Response |
+|----------|--------|-------------|----------|
+| `/submit_flag/{user_id}/{challenge_id}` | POST | Validates a submitted flag for a specific user and challenge. Checks if the flag is correct, dynamic, or static. | `{ "status": "successful", "points_awarded": 100 }` |
+| `/validate_flag/{challenge_id}/{user_id}` | POST | Validates a static flag for a specific user and challenge. | `{ "status": "successful", "message": "Flag is valid!" }` |
+
+### Dynamic Flags
+These endpoints handle the generation and validation of dynamic flags for challenges.
+
+| Endpoint | Method | Description | Response |
+|----------|--------|-------------|----------|
+| `/submit_flag/{user_id}/{challenge_id}` | POST | Validates a dynamically generated flag for a specific user and challenge. | `{ "status": "successful", "points_awarded": 100 }` |
+
+### Shared Flags
+These endpoints detect and log shared flags submitted by multiple teams.
+
+| Endpoint | Method | Description | Response |
+|----------|--------|-------------|----------|
+| `/submit_flag/{user_id}/{challenge_id}` | POST | Detects if a submitted flag has already been used by another team and flags it as shared. | `{ "status": "shared", "message": "Flag is shared with another team." }` |
+
+### Admin Panel
+These endpoints provide tools for administrators to monitor and manage flagged activities, teams, and challenges.
+
+| Endpoint | Method | Description | Response |
+|----------|--------|-------------|----------|
+| `/admin_panel` | GET | Retrieves all valid and shared flag submissions for admin review. | `{ "valid_flags": [...], "shared_flags": [...] }` |
+
+---
+
+## Workflow
+
+1. **Flag Submission**:  
+   - Users submit flags through the `/submit_flag/{user_id}/{challenge_id}` endpoint.  
+   - The system validates the flag, checks if it’s dynamic or static, and calculates points based on submission time.  
+
+2. **Shared Flag Detection**:  
+   - If a flag has already been submitted by another team, it is flagged as shared and logged in the database.  
+
+3. **Admin Panel Review**:  
+   - Admins can use the `/admin_panel` endpoint to review valid and shared flags, monitor suspicious activities, and manage teams or challenges.  
+
+---

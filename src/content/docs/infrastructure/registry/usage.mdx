@@ -1,0 +1,85 @@
+---
+title: Registry | Usage
+description: Usage of the CTF FlagFrenzy Registry
+---
+
+Some Text 
+
+## 🧠 Context and Reasoning
+
+Once the private registry is running and secured with TLS, client machines (developer workstations, build servers, K3s nodes) need to be configured to trust its certificate and authenticate before they can push or pull images.
+
+## 🧱 Architecture Overview (Placeholder)
+
+*(Placeholder: Show Client Docker Daemon -> Registry Host:5000, highlighting the need for CA cert trust and login credentials)*
+
+## 🛠️ Implementation Steps (Client-Side)
+
+These steps need to be performed on any machine that will interact with the private registry using the `docker` CLI. (See `cluster/internal-registry.mdx` for K3s agent configuration).
+
+1.  **Copy Registry Certificate:**
+    Securely copy the registry's public certificate (`domain.crt` from the registry host's `~/docker-registry/certs/` directory) to the client machine. The example uses `/usr/share/ca-certificates` which is a common location for system-wide trust. Replace `user` and `web.ctf.htl-villach.at` with the appropriate username and registry hostname/IP.
+    ```bash
+    # Example using scp
+    sudo scp user@web.ctf.htl-villach.at:~/docker-registry/certs/domain.crt /usr/share/ca-certificates/web.ctf.htl-villach.at.crt
+    ```
+    *(Note: Renaming the file to something descriptive like `web.ctf.htl-villach.at.crt` is good practice).*
+
+2.  **Update CA Trust Store:**
+    Run the system command to update the list of trusted Certificate Authorities. This command varies by distribution. For Debian/Ubuntu:
+    ```bash
+    sudo dpkg-reconfigure ca-certificates
+    ```
+    In the graphical/text interface that appears, ensure the newly added certificate (`web.ctf.htl-villach.at.crt` or similar) is selected (usually using the spacebar) before confirming.
+
+3.  **Configure Docker Daemon (Alternative/Direct Method):**
+    Instead of system-wide trust, you can configure the Docker daemon specifically. Create a directory named after the registry host and port, and place the CA certificate there. Use the **registry service port (5000)**, not the Nginx proxy port (8443), as this configures the daemon's direct interaction.
+    ```bash
+    # Use the FQDN and PORT the docker client will use to connect
+    sudo mkdir -p /etc/docker/certs.d/web.ctf.htl-villach.at:5000
+    sudo cp /usr/share/ca-certificates/web.ctf.htl-villach.at.crt /etc/docker/certs.d/web.ctf.htl-villach.at:5000/ca.crt
+    ```
+    *(Restart the Docker daemon after this: `sudo systemctl restart docker`)*
+
+4.  **Log In:**
+    Use `docker login` with the registry's hostname and **port 5000**. Enter the username and password created with `htpasswd`.
+    ```bash
+    docker login https://web.ctf.htl-villach.at:5000
+    # Enter username and password when prompted
+    ```
+
+5.  **Tag an Image:**
+    Tag an existing local image (e.g., `my-image:latest`) with the full registry path.
+    ```bash
+    # Example: Tagging an image named 'base_image'
+    docker tag base_image:latest web.ctf.htl-villach.at:5000/my-app:v1.0
+    # General format:
+    # docker tag <local_image_name>:<local_tag> <registry_host>:<port>/<repository_name>:<tag>
+    ```
+
+6.  **Push the Image:**
+    Push the tagged image to the private registry.
+    ```bash
+    docker push web.ctf.htl-villach.at:5000/my-app:v1.0
+    ```
+
+7.  **Pull the Image:**
+    Pull an image from the registry (useful for testing or deploying on other machines).
+    ```bash
+    docker pull web.ctf.htl-villach.at:5000/my-app:v1.0
+    ```
+
+8.  **Access the UI:**
+    Browse the registry content using the Nginx proxy address: `https://web.ctf.htl-villach.at:8443` (or the appropriate hostname/IP).
+
+## ⚠️ Tips, Caveats, Troubleshooting
+
+* **Certificate Trust:** If `docker login`, `push`, or `pull` fail with "x509: certificate signed by unknown authority", the client Docker daemon does not trust the registry's certificate. Ensure steps 1-3 were done correctly. A system **reboot** or Docker **daemon restart** (`sudo systemctl restart docker`) is often required after modifying certificates.
+* **Hostname/Port Mismatch:** Ensure the hostname and port used in `docker login`, `tag`, `push`, `pull`, and the `/etc/docker/certs.d/` path exactly match how the registry is accessed (e.g., `web.ctf.htl-villach.at:5000`).
+* **Authentication:** Incorrect username/password will result in authentication errors. Verify credentials.
+* **K3s/Containerd:** Note that K3s uses `containerd` (via `crictl` or Kubernetes manifests), not the Docker daemon directly on nodes. Agent configuration is different (see `cluster/internal-registry.mdx`). However, `docker` CLI usage is common for building and pushing images *to* the registry from a development machine.
+* **Nginx Proxy vs. Direct Access:** The Docker CLI interacts directly with the registry service on port 5000 (using HTTPS because the registry service itself is configured for TLS). The Nginx proxy on 8443 is primarily for the Web UI and potentially simplifying external access if needed (though not used by the Docker CLI here).
+
+## 📄 Clear Formatting, Tested Shell/YAML Blocks
+
+Commands are ready to be used after replacing placeholders like usernames, hostnames, and image names.

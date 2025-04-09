@@ -1,24 +1,108 @@
 ---
-title: hidden_frequencies
+title: "CTF Steganography-Challenge | Hidden Frequencies Medium Level"
 description: Hidden Frequencies challenge
 ---
 
-# Hidden Frequencies
+`Hidden Frequencies` is a challenge where several steps are needed to get the flag.
 
-## Challenge Description
+#### Directory Structure
 
-[Description of the Hidden Frequencies challenge]
+```
+Hidden_Frequencies
+├── challenge
+│   ├── Dockerfile
+│   ├── hidden_frequencies.bmp
+│   └── script.py
+├── docker-compose.yml
+├── Hidden_Frequencies.md
+├── media
+│   ├── image-01.png
+│   ├── image-02.png
+│   └── image-03.png
+└── writeup.md
+```
 
-## Difficulty
+## Technical Implementation
 
-[Easy/Medium/Hard]
+### Architecture
 
-## Hints
+This challenge has .. parts:
 
-1. [Hint 1]
-2. [Hint 2]
-3. [Hint 3]
+1. **Creation of audio file**
+2. **Picture with imbedded file**
+3. **Docker Configuration**
 
-## Solution
+### Component 1: Creation of audio file
 
-[Solution details to be added]
+- To create the audio file containing the flag, the flag was written on a picture with white background. This file then was converted to a audio file, where the spectogram looked like the flag on the picture.
+
+### Component 2: Picture with imbedded file
+
+- Make a .zip file out of it, so it can be imedded in the image.
+- Hide the .zip file with steghide inside the picture. It has to be a .bmp and big enough to contain it.
+- When asked, set a password.
+- Hide the password at the end of the file, so that when using cat at the end of the output the password is displayed.
+
+### Component 3: Docker Configuration
+
+#### Docker compose (`docker-compose.yml`):
+```yml
+version: '3'
+services:
+  challenge:
+    build: challenge/
+    ports:
+      - "80:80"
+    restart: unless-stopped
+```
+
+#### Dockerfile (`challenge/Dockerfile`):
+```dockerfile
+# Use a lightweight Python image
+FROM python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Copy necessary files
+COPY script.py .
+COPY hidden_frequencies.bmp .
+
+# Install dependencies
+RUN pip install flask
+
+# Expose port 5000
+EXPOSE 80
+
+# Run the server
+CMD ["python", "script.py"]
+```
+
+**HAVE FUN**
+
+## Challenge Writeup
+
+### Step 1: Find password
+
+- When attempting to extract data using steghide, we are prompted for a passphrase. Since no password is provided, we need to find it within the file itself.
+- After running this command, we find the password needed for steghide.
+
+### Step 2: Extract hidden file
+
+- Now that we have the password, we can use steghide to extract the hidden file. This will extract a compressed archive (.tar.gz).
+- Extract the archive:
+
+### Step 3: Analysing audio file
+
+- Since the challenge name suggests something related to frequencies, we should inspect the spectrogram of the audio file.
+- Open the audio file in Audacity, click on the track name and select Spectrogram View. The flag will be displayed within the frequency spectrum
+
+### Tools Used
+
+* steghide
+* cat
+* Audacity
+
+### Conclusion
+
+This challenge combined steganography (Steghide), forensics (strings analysis), and audio analysis (spectrogram) to hide and reveal the flag. Players needed to think outside the box and explore multiple data-hiding techniques.

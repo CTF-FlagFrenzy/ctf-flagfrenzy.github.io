@@ -5,7 +5,7 @@ description: Overview of all CTF challenges
 
 This section contains all the challenges available in the CTF FlagFrenzy platform.
 
-### Challenge Categories
+## Challenge Categories
 
 - Web Challenges
 - Others
@@ -97,3 +97,96 @@ Here are the Blockchain challenges:
 | Challenge              | Difficulty | Flags | Status    | Authors                | Solves |
 | :--------------------- | :--------- | :---- | :-------- | :--------------------- | :----- |
 | Solana_Dumb_Contract | Expert     | 1     | 100% done | [zVSciy](https://github.com/zVSciy) | 2      |
+
+## Flag Generation Logic
+
+Most challenges in this CTF platform use a standardized approach to flag generation, making flags unique for each team while ensuring reproducibility.
+
+### Standard Flag Format
+
+Flags generally follow the format: `FF{hash_value}`
+
+### Flag Generation Process
+
+1. **Challenge-specific Secret**
+   - Each challenge has a predefined secret string (challenge key)
+   - Example: `"#8W@3fp5#Y"`, `"k^kpB2Y99nKwhjex8!G1zn6RhnPtUZsQF0g&"`, etc.
+
+2. **Team-specific Secret**
+   - A unique key assigned to each team, typically provided via environment variables
+   - Always passed as the `TEAMKEY` environment variable 
+
+3. **Flag Calculation**
+   - The challenge key and team key are concatenated
+   - The combined string is hashed using SHA-256
+   - The resulting hash is formatted within `FF{...}`
+
+### Examples from Different Challenge Types
+
+```python
+# Web Challenge
+challengeflag = "t9gE6@W!Nz"
+teamflag = os.environ.get("TEAMKEY")
+combined_flag = challengeflag + teamflag
+hashed_flag = "FF{" + hashlib.sha256(combined_flag.encode()).hexdigest() + "}"
+```
+
+```python
+# Reversing Challenge
+challengeflag = "#8W@3fp5#Y"
+teamflag = os.environ.get("TEAMKEY")
+combined_flag = challengeflag + teamflag
+hashed_flag = "FF{" + hashlib.sha256(combined_flag.encode()).hexdigest() + "}"
+```
+
+```python
+# Cryptography Challenge
+team_key = os.getenv("TEAMKEY")
+challenge_key = "k^kpB2Y99nKwhjex8!G1zn6RhnPtUZsQF0g&"
+combined_flag = challenge_key + team_key
+hashed_flag = f"FF{{{hashlib.sha256(combined_flag.encode()).hexdigest()}}}"
+```
+
+### Docker Environment Variables
+
+When running challenges locally or in a CTF environment, the necessary environment variables are typically passed through Docker:
+
+```yaml
+# Example docker-compose.yml environment section
+environment:
+  - TEAMKEY=unique_team_identifier_string
+```
+
+In production, these environment values are automatically updated through the cluster deployment pipeline. Each team receives their unique `TEAMKEY` value, which is injected into container instances when provisioned in the Kubernetes cluster. This ensures that each team receives unique flag values while maintaining consistent challenge behavior across all deployments.
+
+In some challenges, additional environment variables might be used:
+- `CHALLENGEKEY_2`: For challenges with multiple flags
+- Challenge-specific variables for custom configuration
+
+## Installation (For Local Testing)
+
+**Linux**
+
+- [Docker Linux installation](https://docs.docker.com/engine/install/ubuntu/)
+- [Docker-compose Linux installation](https://docs.docker.com/compose/install/linux/)
+
+**Windows**
+
+- [Docker Windows installation](https://docs.docker.com/desktop/setup/install/windows-install/)
+- [Docker-compose Windows installation](https://docs.docker.com/compose/install/)
+
+After installing Docker and Docker Compose, you need to clone the repository:
+
+```
+git clone https://github.com/CTF-FlagFrenzy/challenges.git
+```
+
+Then navigate to the root of the challenge you want to run:
+
+```
+docker-compose up
+```
+
+You can view running containers with `docker ps`.
+
+**HAVE FUN**

@@ -1,6 +1,6 @@
 ---
 title: "CTF Web-Challenge | The SQL Heist: Easy Level"
-description: The Sql Heist challenge
+description: The SQL Heist challenge
 ---
 
 The SQL Heist challenge revolves around exploiting a vulnerable search functionality within a web application to retrieve sensitive data. 
@@ -8,79 +8,113 @@ The web app allows users to search for articles using a query, but the query is 
 making it susceptible to SQL injection attacks.
 The challenge focuses on understanding and exploiting SQL injection vulnerabilities to gain unauthorized access to the flag stored within the system.
 
+#### Directory Structure
 
-### Docker Configuration
-
-Starting off with the docker-compose file, this file starts the challenge container for the CTF. 
-
-```yml
-version: '3'
-
-volumes:
-  my-django-data:
-
-services:
-  web:
-    build:
-      context: .
-      dockerfile: django/Dockerfile
-
-    volumes:
-      - my-django-data:/media
-
-    working_dir: '/code'
-
-    ports:
-      - '80:80'
-      
-    environment:
-      - TEAMKEY=XXXXXXX
+```
+The_SQL_Heist/
+├── docker-compose.yml           
+├── test_The_SQL_Heist.md       
+├── The_SQL_Heist.md            
+├── writeup.md               
+├── media/                   
+│   ├── image.png                
+│   └── image-1.png              
+└── django/                   
+    ├── db.sqlite3          
+    ├── Dockerfile               
+    ├── manage.py               
+    ├── requirements.txt         
+    ├── The_SQL_Heist/           
+    │   ├── __init__.py
+    │   ├── asgi.py              
+    │   ├── settings.py          
+    │   ├── urls.py              
+    │   ├── wsgi.py              
+    │   └── __pycache__/
+    └── The_SQL_Heist_App/       
+        ├── __init__.py
+        ├── admin.py             
+        ├── apps.py              
+        ├── models.py            
+        ├── urls.py              
+        ├── views.py             
+        ├── migrations/          
+        │   ├── __init__.py
+        │   ├── 0001_initial.py
+        │   ├── 0002_auto_20241024_2007.py
+        │   └── 0003_article_flag.py
+        └── templates/           # HTML templates
+            └── SQL_Heist/
+                └── index.html   # Main page template
 ```
 
-### Web Application Frontend
+## Technical Implementation
 
-The web application presents a news site with a search functionality. Articles are displayed in a grid layout, with a main section for article listings and a sidebar for breaking news. When the flag is found through exploitation, it appears as a red notification box in the bottom-right corner of the screen.
+### Architecture
+The challenge uses a Django web application with the following components:
+
+1. **Web Interface**: A news site with a search functionality that allows users to query articles
+2. **Database**: SQLite database storing articles, including a special one with the flag
+3. **Backend Logic**: Django views with a vulnerable SQL query implementation
+4. **Containerization**: Docker configuration for deployment and isolation
+
+### Component 1: Web Interface (`index.html`)
+
+The frontend provides a search box and displays news articles in a grid layout, with a main section for article listings and a sidebar for breaking news.
+
+#### Key Features:
+- Search box for querying articles
+- Grid layout with main content and sidebar
+- Special flag display area that appears when the flag is found
 
 ```html
-    <main class="container mx-auto p-4 grid grid-cols-3 gap-4">
-        <!-- Articles Section -->
-        <section class="col-span-2 scrollable">
-            { % for article in articles % }
-                <article class="bg-gray-800 p-4 rounded-lg mb-4">
-                    <h2 class="text-xl font-bold mb-2">{{ article.title }}</h2>
-                    <p class="text-gray-400">{{ article.content }}</p>
-                </article>
-            {% empty %}
-                <p class="text-gray-400">No articles found.</p>
+<!-- Main content section showing search results -->
+<main class="container mx-auto p-4 grid grid-cols-3 gap-4">
+    <!-- Articles Section -->
+    <section class="col-span-2 scrollable">
+        { % for article in articles % }
+            <article class="bg-gray-800 p-4 rounded-lg mb-4">
+                <h2 class="text-xl font-bold mb-2">{{ article.title }}</h2>
+                <p class="text-gray-400">{{ article.content }}</p>
+            </article>
+        {% empty %}
+            <p class="text-gray-400">No articles found.</p>
+        {% endfor %}
+    </section>
+
+    <!-- Breaking News Section -->
+    <aside class="bg-gray-800 p-4 rounded-lg scrollable">
+        <h2 class="text-xl font-bold shine mb-2">Breaking News</h2>
+        <ul class="text-gray-400">
+            {% for news in breaking_news %}
+                <li class="fas fa-newspape text-white shine mb-2 glow-red">{{ news.title }}</li>
             {% endfor %}
-        </section>
+        </ul>
+    </aside>
+</main>
 
-        <!-- Breaking News Section -->
-        <aside class="bg-gray-800 p-4 rounded-lg scrollable">
-            <h2 class="text-xl font-bold shine mb-2">Breaking News</h2>
-            <ul class="text-gray-400">
-                {% for news in breaking_news %}
-                    <li class="fas fa-newspape text-white shine mb-2 glow-red">{{ news.title }}</li>
-                {% endfor %}
-            </ul>
-        </aside>
-    </main>
-
-    <!-- Footer -->
-    <footer class="bg-gray-800 p-4 text-center rounded-lg mt-4 w-full fixed bottom-0">
-              <p class="text-gray-500">&copy; 2023 Dark News Paper. All rights reserved.</p>
-    </footer>
-
-    {% if flag %}
-        <div class="fixed bottom-0 right-0 m-4 p-4 bg-red-600 text-white rounded-lg">
-            <p><strong>Flag: {{ flag }}</strong></p>
-        </div>
-    {% endif %}
+<!-- Flag display section -->
+{% if flag %}
+    <div class="fixed bottom-0 right-0 m-4 p-4 bg-red-600 text-white rounded-lg">
+        <p><strong>Flag: {{ flag }}</strong></p>
+    </div>
+{% endif %}
 ```
 
-### Backend Implementation & Vulnerability
+### Component 2: Database Model (`models.py`)
 
-The challenge contains a classic SQL injection vulnerability in the search functionality. Here's the actual implementation from the views.py file:
+The database structure includes an Article model that stores news articles and the flag.
+
+```python
+class Article(models.Model):
+    title = models.CharField(max_length=200)
+    content = models.TextField()
+    flag = models.CharField(max_length=64, blank=True, null=True)
+```
+
+### Component 3: Backend Logic (`views.py`)
+
+The core of the challenge is the vulnerable search implementation in the index view:
 
 ```python
 def index(request):
@@ -136,109 +170,117 @@ def index(request):
     )
 ```
 
-### Understanding the Vulnerability
-
-The vulnerability exists in the construction of the SQL query, where user input (`query`) is directly concatenated into the SQL string:
+#### Key Vulnerability:
+The SQL injection vulnerability exists in the construction of the SQL query, where user input (`query`) is directly concatenated into the SQL string:
 
 ```python
 sql_query = f"SELECT * FROM The_SQL_Heist_App_article WHERE title LIKE '%{query}%' OR content LIKE '%{query}%'"
 ```
 
-This creates a classic SQL injection point where attackers can escape the string context and inject their own SQL commands. For example, entering a payload like `' OR '1'='1' --` would modify the query to:
+This allows attackers to escape the string context and inject their own SQL commands, potentially accessing all articles including the one containing the flag.
 
-```sql
-SELECT * FROM The_SQL_Heist_App_article WHERE title LIKE '%' OR '1'='1' --%' OR content LIKE '%' OR '1'='1' --%'
+### Component 4: Containerization
+
+The application is containerized using Docker for easy deployment and isolation.
+
+#### Dockerfile (`flask_app/Dockerfile`):
+
+```dockerfile
+FROM python:3
+
+COPY django/requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . code
+WORKDIR /code
+
+EXPOSE 80
+
+RUN python django/manage.py migrate
+ENTRYPOINT ["python", "django/manage.py"]
+RUN python django/manage.py migrate
+CMD ["runserver", "0.0.0.0:80"]
 ```
 
-The `OR '1'='1'` condition is always true, causing the query to return all articles, including the "Special Article" that contains the flag. The `--` syntax comments out the rest of the query, preventing syntax errors.
+#### Docker Compose (`docker-compose.yml`):
 
-A more specific payload like `' OR flag IS NOT NULL --` would target only the article containing the flag.
+```yml
+version: '3'
 
-### Database Model
+volumes:
+  my-django-data:
 
-The Article model that stores the flag looks like this:
+services:
+  web:
+    build:
+      context: .
+      dockerfile: django/Dockerfile
 
-```python
-class Article(models.Model):
-    title = models.CharField(max_length=200)
-    content = models.TextField()
-    flag = models.CharField(max_length=64, blank=True, null=True)
+    volumes:
+      - my-django-data:/media
+
+    working_dir: '/code'
+
+    ports:
+      - '80:80'
+      
+    environment:
+      - TEAMKEY=XXXXXXX
 ```
 
-### Installation (For Local Testing)
 
-> [!NOTE]
-> Make sure to install docker and docker-compose first
+#### Container Design:
 
-**Linux**
+1. **Base Image**
+   - Uses Python 3 as the foundation
+   - Provides a consistent runtime environment
 
-- [Docker Linux installation](https://docs.docker.com/engine/install/ubuntu/)
-- [Docker-compose Linux installation](https://docs.docker.com/compose/install/linux/)
+2. **Dependencies**
+   - Installs required packages from requirements.txt
+   - Primarily Flask and Werkzeug
 
-**Windows**
+3. **Networking**
+   - Exposes port 80 for web traffic
 
-- [Docker Windows installation](https://docs.docker.com/desktop/setup/install/windows-install/)
-- [Docker-compose Windows installation](https://docs.docker.com/compose/install/)
-
-After you installed docker and docker-compose you need to pull the repository via cli using this command.
-
-```
-git clone https://github.com/CTF-FlagFrenzy/challenges.git
-```
-
-Then you navigate to the root of the `The_SQL_Heist` challenge and type the following command in the cli.
-
-```
-docker-compose up
-```
-
-You can see all running container with `docker ps`.
-
-### Exploitation
-
-To successfully exploit the vulnerability and retrieve the flag:
-
-1. Access the web application at http://localhost (or the deployed URL)
-2. In the search box at the top of the page, enter the SQL injection payload: `' OR flag IS NOT NULL --`
-3. Submit the search query
-4. The flag will appear in a red box in the bottom-right corner of the screen
-
-**HAVE FUN**
+4. **Environment Variables**
+   - TEAMKEY: Team-specific key used in flag generation
+   - Can be customized for each deployment
 
 ## Challenge Writeup
 
-### Steps to Solve
+### Step 1: Explore the Web Page
+Begin by accessing the challenge page and examining its features to identify potential vulnerabilities. In this case, a search function is available, which may be vulnerable to injection attacks.
 
-1. **Explore the Web Page**
+![Screenshot of search function](../../../../assets/web-challenge/the-sql-heist/image.png)
 
-    - Begin by accessing the challenge page and examining its features to identify potential vulnerabilities. In this case, a search function is available, which may be vulnerable to injection attacks.
-    - The attacker investigates the search box by inputting various entries to see how the application responds. This kind of exploration often reveals clues about potential weaknesses in how input data is processed.
-    
-    ![Screenshot of search function](../../../../assets/web-challenge/the-sql-heist/image.png)
+### Step 2: Test for SQL Injection
+After analyzing the page, try a basic SQL injection attack on the search function:
 
-2. **Exploit the Search Function**
+```sql
+' OR '1'='1' --
+```
 
-    - After analyzing the page, the attacker attempts a **SQL injection** attack on the search function to access the flag. SQL injection involves inserting specially crafted SQL commands into input fields, exploiting the lack of proper input sanitization.
-    - The attacker uses the following SQL injection payload in the search box:
-      
-      ```sql
-      ' OR '1'='1' --
-      ```
-      
-      - **Explanation**: This payload works by ending the initial SQL query string, injecting a true statement (`'1'='1'`), and then commenting out the rest of the query using `--`. This effectively bypasses the usual logic of the search query, causing it to return more results than intended, including the hidden flag.
-    - After entering the payload, the flag is revealed as a red popup notification in the bottom-right corner of the page.
+This payload works by:
+- Closing the initial quote with `'`
+- Adding an `OR` clause that's always true (`'1'='1'`)
+- Commenting out the rest of the query with `--`
 
-3. **Retrieve the Flag**
+This bypasses the intended search logic, causing the query to return all articles.
 
-    - The attacker notes down the flag displayed in the popup and successfully completes the challenge.
-    
-    ![alt text](../../../../assets/web-challenge/the-sql-heist/image-1.png)
+### Step 3: Retrieve the Flag
+After entering the SQL injection payload, the flag will appear in a red notification box in the bottom-right corner of the screen.
+
+![Flag revealed](../../../../assets/web-challenge/the-sql-heist/image-1.png)
+
+This specifically returns only the article containing the flag.
+
+### Key Insights
+This challenge demonstrates how improper input sanitization in database queries can lead to unauthorized access to sensitive data. In real-world applications, parameterized queries or ORMs should be used to prevent such vulnerabilities.
 
 ### Tools Used
+- Basic web browser
+- Understanding of SQL injection techniques
+- Knowledge of SQL syntax and operators
 
-- **SQL Injection Basics**: Understanding basic SQL commands and techniques, especially SQL injection, is essential for solving this challenge.
 
-### Conclusion
-
-This challenge demonstrates how a simple input vulnerability in a search function can lead to unintended access to sensitive data. By exploiting SQL injection, the attacker was able to bypass the search logic and retrieve the flag, highlighting the importance of secure coding practices and input validation. Ensuring that all inputs are sanitized and using prepared statements can help prevent such vulnerabilities in real-world applications.
 

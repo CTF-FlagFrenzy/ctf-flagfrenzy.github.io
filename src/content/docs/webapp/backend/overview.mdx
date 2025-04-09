@@ -3,21 +3,34 @@ title: Backend Architecture
 description: Overview of the CTF FlagFrenzy backend implementation
 ---
 
-# Backend Architecture
-
-The CTF FlagFrenzy backend provides the APIs and services that power the platform.
+The backend of the webapp manages and interacts with the data needed for the frontend. Data such as teams, users, challenges, and completed challenges are stored in the web app’s database. FastAPI is used to access the backend database, and this instance is configured to be accessible only by the web app itself. Users authenticate through the school’s Active Directory, ensuring secure access. The frontend is built using SvelteKit, which provides a reactive and efficient user interface framework.
 
 ## Technology Stack
 
-- Node.js with Express
-- TypeScript
-- PostgreSQL database
-- Redis for caching and real-time updates
+- Python
+- Fastapi
+- MySQL
 
 ## Core Services
 
-- **Authentication Service**: Manages user identity and access control
-- **Challenge Service**: Handles challenge deployment, status, and flag validation
-- **Scoring Service**: Calculates points and maintains the competition scoreboard
-- **Team Service**: Manages team creation, updates, and member coordination
-- **Notification Service**: Provides real-time updates and announcements
+- **Database**: Database Design
+- **Challenge Endpoints**: Handles challenge creation, updates, deletion, infos, and hints 
+- **Team Endpoints**: Manages team creation, updates, deletion, member coordination, and infos
+- **User Endpoints**: Manages user creation, updates, deletion, and infos
+- **Endpoints for the Cluster**: Manages challenges deploying and deprovisioning
+
+
+## Folder Tree
+Here you can see the folder tree of the API. The database connection is established in the database.py file and the creation of the tables is defined in the model.py. The whole Fastapi is in the main.py.
+```
+│   DockerFile
+│   requirements.txt
+└───src
+    │   main.py
+    │   script.py
+    │
+    ├───model
+    │   │   database.py
+    │   │   models.py
+    │   │   __init__.py
+```

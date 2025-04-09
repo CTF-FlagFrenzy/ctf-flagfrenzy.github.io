@@ -1,24 +1,408 @@
 ---
-title: pixel_spy
+title: "CTF Forensics-Challenge | Pixel:_Spy : Easy (Junior)"
 description: Pixel Spy challenge
 ---
 
-# Pixel Spy
+Pixel Spy is a Capture The Flag (CTF) challenge designed to test participants' ability to extract hidden information from image metadata. The challenge involves a web server that displays an image with a flag embedded in its EXIF data. Participants must analyze the image to discover the hidden flag.
 
-## Challenge Description
+#### Directory Structure
 
-[Description of the Pixel Spy challenge]
+```
+Pixel_Spy/
+├── docker-compose.yml
+├── flask_app/
+│   ├── Dockerfile
+│   ├── app.py
+│   ├── modify_image.py
+│   ├── hacker.jpg
+│   ├── requirements.txt
+│   ├── static/
+│   │   └── image_with_flag.jpg
+│   └── templates/
+│       └── index.html
+```
 
-## Difficulty
+## Technical Implementation
 
-[Easy/Medium/Hard]
+### Architecture
+The challenge uses a microservice architecture built with the following components:
 
-## Hints
+1. **Web Server** (`app.py`): A Flask application that serves the main page and processes the image.
+2. **Image Modifier** (`modify_image.py`): A Python script that embeds the flag in the image metadata.
+3. **Frontend** (`index.html`): HTML/CSS template that displays the image in a hacker-themed interface.
+4. **Containerization** (`Dockerfile` and `docker-compose.yml`): Configuration for deployment and isolation.
 
-1. [Hint 1]
-2. [Hint 2]
-3. [Hint 3]
+### Component 1: Web Server (`app.py`)
 
-## Solution
+This is the main entry point for the challenge. It's a Flask web application that:
+- Serves the root endpoint with the webpage
+- Calls the image modification script to embed the flag
+- Handles error conditions and logging
 
-[Solution details to be added]
+#### Full Source Code:
+
+```python
+import logging
+import os
+import subprocess
+
+from flask import Flask, render_template
+
+app = Flask(__name__)
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+@app.route("/")
+def home():
+    # Path to the existing image
+    os.path.join(os.path.dirname(__file__), "hacker.jpg")
+
+    # Modify the image
+    try:
+        subprocess.run(
+            ["python", os.path.join(os.path.dirname(__file__), "modify_image.py")],
+            check=True,
+        )
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Error modifying image: {e}")
+        return "Error modifying image", 500
+
+    # Path to the modified image
+    os.path.join("static", "image_with_flag.jpg")
+
+    # Use a relative URL for the image
+    image_url = "/static/image_with_flag.jpg"
+
+    return render_template("index.html", image_url=image_url)
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=80)
+```
+
+#### Key Features:
+
+1. **Path Configuration**
+   - Uses file paths to access the original and modified images
+   - Implements error handling for image modification failures
+
+2. **Logging**
+   - Basic logging configuration to capture important events
+   - Provides error details when image processing fails
+
+3. **Root Endpoint (`/`)**
+   - Triggers the image modification process
+   - Passes the image URL to the HTML template
+   - Returns appropriate error messages if image processing fails
+
+### Component 2: Image Modifier (`modify_image.py`)
+
+This script is responsible for:
+- Generating a unique flag based on a fixed challenge string and team-specific key
+- Embedding the flag into the EXIF metadata of an image
+- Saving the modified image for the web server to serve
+
+#### Full Source Code:
+
+```python
+import hashlib
+import logging
+import os
+
+import piexif
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
+
+challengeflag = "T1#mXeG24B"
+teamflag = os.environ.get("TEAMKEY")
+combined_flag = challengeflag + teamflag if challengeflag and teamflag else None
+
+if combined_flag:
+    hashed_flag = "FF{" + hashlib.sha256(combined_flag.encode()).hexdigest() + "}"
+    logger.info("Flag successfully created and hashed: %s", hashed_flag)
+else:
+    logger.error(
+        "Failed to create flag. Ensure TEAMKEY and CHALLENGEKEY are set in environment variables."
+    )
+    hashed_flag = "FLAG_NOT_DEFINED"
+
+# Define the paths
+base_dir = os.path.dirname(os.path.abspath(__file__))
+image_path = os.path.join(base_dir, "hacker.jpg")
+static_dir = os.path.join(base_dir, "static")
+modified_image_path = os.path.join(static_dir, "image_with_flag.jpg")
+
+# Load the existing image
+if not os.path.exists(image_path):
+    logger.error(f"Image not found at path: {image_path}")
+    raise FileNotFoundError(f"Image not found at path: {image_path}")
+
+# Load the image and its EXIF data
+try:
+    exif_dict = piexif.load(image_path)
+except ValueError as e:
+    if str(e) == "doesnot have exif":
+        logger.info("Image does not have EXIF data, creating new EXIF data.")
+        exif_dict = {
+            "0th": {},
+            "Exif": {},
+            "GPS": {},
+            "Interop": {},
+            "1st": {},
+            "thumbnail": None,
+        }
+    else:
+        raise
+
+# Add the flag to the image metadata
+exif_dict["0th"][piexif.ImageIFD.ImageDescription] = hashed_flag
+exif_bytes = piexif.dump(exif_dict)
+
+# Ensure the static directory exists
+if not os.path.exists(static_dir):
+    os.makedirs(static_dir)
+
+# Save the modified image with metadata
+piexif.insert(exif_bytes, image_path, modified_image_path)
+
+logger.info(
+    "Flag successfully added to the image metadata and saved as: %s",
+    modified_image_path,
+)
+```
+
+#### Key Algorithms:
+
+1. **Flag Generation**
+   - Combines a fixed challenge string (`T1#mXeG24B`) with a team-specific key
+   - Applies SHA-256 hashing to create a unique flag
+   - Formats it with the `FF{...}` prefix
+
+2. **EXIF Metadata Handling**
+   - Loads existing EXIF data from the image if available
+   - Creates new EXIF data structure if none exists
+   - Embeds the flag in the ImageDescription field
+
+3. **File Handling**
+   - Verifies paths and creates necessary directories
+   - Saves the modified image with the embedded flag
+   - Implements error handling for missing files
+
+### Component 3: Frontend (HTML/CSS)
+
+The user interface is a simple, themed webpage that displays the image containing the hidden flag.
+
+#### Full Source Code:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WELCOME</title>
+    <style>
+        body {
+            background-color: #0d0d0d;
+            color: #00ff00;
+            font-family: 'Courier New', Courier, monospace;
+            text-align: center;
+        }
+        h1 {
+            margin-top: 50px;
+            font-size: 3em;
+        }
+        img {
+            margin-top: 20px;
+            border: 5px solid #00ff00;
+        }
+        .skull {
+            width: 100px;
+            height: 100px;
+            margin: 10px;
+        }
+        .skulls {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>Welcome to the Dark Web</h1>
+    <div class="skulls">
+        <img src="https://img.icons8.com/ios-filled/100/00ff00/skull.png" alt="Hacker Skull" class="skull">
+        <img src="https://img.icons8.com/ios-filled/100/00ff00/skull.png" alt="Hacker Skull" class="skull">
+        <img src="https://img.icons8.com/ios-filled/100/00ff00/skull.png" alt="Hacker Skull" class="skull">
+        <img src="https://img.icons8.com/ios-filled/100/00ff00/skull.png" alt="Hacker Skull" class="skull">
+        <img src="https://img.icons8.com/ios-filled/100/00ff00/skull.png" alt="Hacker Skull" class="skull">
+    </div>
+    <img src="{{ image_url }}" alt="AI Generated Image">
+</body>
+</html>
+```
+
+#### Key Design Elements:
+
+1. **Themed Design**
+   - Dark background with green text for a "hacker" aesthetic
+   - Monospace font family enhances the technical look
+   - Skull icons reinforce the theme
+
+2. **Image Display**
+   - Prominently displays the image with the hidden flag
+   - Green border highlights the image
+   - Dynamic image source from server template
+
+### Component 4: Containerization
+
+The application is containerized using Docker for easy deployment and isolation.
+
+#### Dockerfile:
+
+```dockerfile
+FROM python:3
+
+COPY flask_app/requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . code
+WORKDIR /code
+EXPOSE 80
+
+ENTRYPOINT ["python", "flask_app/app.py"]
+CMD ["flask", "run", "--host=0.0.0.0", "--port=80"]
+```
+
+#### Docker Compose:
+
+```yml
+version: '3'
+
+volumes:
+  my-django-data:
+
+services:
+  flask:
+    build:
+      context: .
+      dockerfile: flask_app/Dockerfile
+
+    ports:
+      - '80:80'
+
+    environment:
+      - TEAMKEY=XXXXXXX
+```
+
+#### Container Design:
+
+1. **Base Image**
+   - Uses Python 3 as the foundation
+   - Provides a consistent runtime environment
+
+2. **Dependencies**
+   - Installs required packages from requirements.txt:
+     - Flask 2.0.2
+     - Werkzeug 2.0.3
+     - piexif 1.1.3
+
+3. **File Structure**
+   - Copies the application code to `/code` in the container
+   - Sets `/code` as the working directory
+
+4. **Networking**
+   - Exposes port 80 for web traffic
+
+5. **Environment Variables**
+   - TEAMKEY: Team-specific key used in flag generation
+   - Can be customized for each deployment
+
+6. **Startup**
+   - Launches the Flask application as the container's main process
+
+## Setting Up the Challenge
+
+### Installation Requirements
+
+> [!NOTE]
+> Make sure to install docker and docker-compose first
+
+**Linux**
+
+- [Docker Linux installation](https://docs.docker.com/engine/install/ubuntu/)
+- [Docker-compose Linux installation](https://docs.docker.com/compose/install/linux/)
+
+**Windows**
+
+- [Docker Windows installation](https://docs.docker.com/desktop/setup/install/windows-install/)
+- [Docker-compose Windows installation](https://docs.docker.com/compose/install/)
+
+### Deployment
+
+After installing Docker and Docker Compose, follow these steps:
+
+1. Clone the repository:
+```
+git clone https://github.com/CTF-FlagFrenzy/challenges.git
+```
+
+2. Navigate to the challenge directory:
+```
+cd challenges/Pixel_Spy
+```
+
+3. Start the Docker container:
+```
+docker-compose up
+```
+
+4. The challenge will be accessible at `http://localhost:80`
+
+You can see all running containers with `docker ps`.
+
+## Challenge Writeup
+
+### Step 1: Download the File
+When visiting the challenge website, you'll see an image displayed on the page.
+
+### Step 2: Save the Image
+Right-click on the image and select "Save Image As" to download it to your computer.
+
+### Step 3: Examine the Metadata
+There are several ways to view the EXIF metadata:
+
+1. **Using a Text Editor**
+   Open the image in a text editor like Notepad and search for `FF{.`
+
+2. **Using EXIF Tools**
+   Use a command-line tool like `exiftool`:
+   ```bash
+   exiftool -ImageDescription image_with_flag.jpg
+   ```
+
+3. **Using Online EXIF Viewers**
+   Upload the image to online EXIF viewers like exif.regex.info or exifdata.com
+
+### Step 4: Extract the Flag
+The flag will be found in the ImageDescription field in the format `FF{hash}`, where the hash is a SHA-256 hash of the combined challenge flag and team key.
+
+### Key Insights
+1. The challenge demonstrates how metadata in files can be used to hide information
+2. EXIF data is a common place to look for hidden information in images
+3. Basic knowledge of image analysis tools is essential to solving this challenge
+
+### Tools Used
+- Web browser to download the image
+- Text editor or EXIF analysis tools to view the metadata
+
+**HAVE FUN**
+
+

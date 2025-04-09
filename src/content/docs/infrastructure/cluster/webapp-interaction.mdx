@@ -1,0 +1,48 @@
+---
+title: Cluster | Web Cluster interaction
+description: Web interaction of the CTF FlagFrenzy Cluster
+---
+
+Some Text
+
+## 🧠 Context and Reasoning
+
+To enable dynamic deployment and management of CTF challenges (or other applications) without granting direct cluster access (e.g., `kubectl`) to end-users or a primary web application, a dedicated API service is introduced.
+
+This service, built using FastAPI, runs on the K3s master nodes and exposes secure endpoints (`/deploy`, `/deprovision`, `/teamkey`). When called (e.g., by a central CTF platform webapp), this API service translates the requests into `kubectl` commands executed against the K3s cluster, using predefined templates and scripts. This abstracts the complexity of Kubernetes interactions and provides a controlled interface.
+
+## 🧱 Architecture Overview (Placeholder)
+
+*(Placeholder: Diagram showing: External Caller (e.g., CTF Webapp) -> Load Balancer (port 443/HTTPS, specific paths like /deploy) -> FastAPI Service (Container on Master, port 8080) -> Executes kubectl commands using mounted kubeconfig -> K3s API Server)*
+
+**Workflow:**
+
+1.  An external system (e.g., CTF frontend) needs to deploy a challenge for a team.
+2.  It sends an authenticated POST request to the LB, e.g., `https://challenge.web.ctf.htl-villach.at/deploy`, with team and challenge details.
+3.  The LB proxies this request (based on path and potentially source IP rules) to the FastAPI service running on a master node.
+4.  The FastAPI service validates the request (API key) and parameters.
+5.  It executes a local script (`deploy.sh`) which uses `envsubst` to populate Kubernetes manifest templates (`deployment.yml`, `ingress.yml`) with team/challenge details and a generated subdomain.
+6.  The script uses `kubectl apply -f -` to create the Deployment, Service, and Ingress resources in a team-specific namespace. `kubectl` uses a mounted kubeconfig file to authenticate with the K3s API server.
+7.  The FastAPI service returns the generated URL (from the Ingress) to the caller.
+8.  Similar workflows exist for creating team secrets (`/teamkey`) and removing resources (`/deprovision`).
+
+## 🛠️ Implementation Steps
+
+The detailed setup of the FastAPI service, its endpoints, scripts, and deployment is covered in:
+
+* **`cluster/fastapi-endpoints.mdx`:** FastAPI code (`main.py`), Dockerfile, Docker Compose setup, API Key.
+* **`cluster/challenge-deployment.mdx`:** Bash scripts (`deploy.sh`, `deprovision.sh`, `teamkey.sh`) and Kubernetes YAML templates (`deployment.yml`, `ingress.yml`).
+* **`cluster/traffic-routing.mdx`:** Nginx configuration on the Load Balancer to route requests to the FastAPI service.
+* **`cluster/secrets.mdx`:** Handling the API Key and the Kubernetes secrets for team keys.
+
+## ⚠️ Tips, Caveats, Troubleshooting
+
+* **Security:** The API Key (`API_KEY`) must be kept secret. The LB configuration includes IP address restrictions (`allow <webapp_IP>; deny all;`) for the API endpoints, adding a layer of network security. Consider further security measures if needed (mTLS, more robust auth).
+* **Error Handling:** The FastAPI code includes basic error handling, raising HTTPExceptions on script failures or invalid requests. Enhance logging and error reporting as needed.
+* **Idempotency:** `kubectl apply` is largely idempotent, making the `/deploy` endpoint relatively safe to call multiple times (it will update existing resources). `/deprovision` uses `kubectl delete`, which is also idempotent (it won't fail if the resource is already gone). `/teamkey` uses `kubectl create`, which *will* fail if the namespace or secret already exists; consider adding checks or using `apply` for secrets too.
+* **Resource Management:** Ensure the deployment scripts clean up all associated resources (Deployment, Service, Ingress, potentially Namespace if desired) during deprovisioning.
+* **Kubeconfig:** The FastAPI container needs access to a valid kubeconfig file with sufficient permissions to manage resources in the cluster. The example uses RBAC to create a dedicated service account (`deployer`) with limited permissions (`edit` role in `default` namespace, though scripts create resources in *new* namespaces, potentially requiring broader permissions like `cluster-admin` or more granular RoleBindings per-namespace). See `cluster/secrets.mdx` discussion on RBAC.
+
+## 📄 Clear Formatting, Tested Shell/YAML Blocks
+
+Relevant code, scripts, and configurations are found in the linked detailed implementation documents.

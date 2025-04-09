@@ -1,24 +1,60 @@
 ---
-title: profile_prodigy
+title: "CTF OSINT-Challenge | Profile Prodigy: Easy Level"
 description: Profile Prodigy challenge
 ---
+`Profile Prodigy` provides a name of a person (Tanja Alina Weiss) and the goal is to find as much information as possible concerning this person.
 
-# Profile Prodigy
+#### Directory Structure
 
-## Challenge Description
+```
+Profile_Prodigy
+├── media
+│   ├── image-01.png
+│   └── image-03.png
+├── Profile_Prodigy.md
+└── writeup.md
+```
 
-[Description of the Profile Prodigy challenge]
+## Technical Implementation
 
-## Difficulty
+### Architecture
 
-[Easy/Medium/Hard]
+This challenge has 2 parts:
 
-## Hints
+1. **Creating Accounts**
+2. **Costumizing Accounts**
 
-1. [Hint 1]
-2. [Hint 2]
-3. [Hint 3]
+### Component 1: Creating Accounts
 
-## Solution
+1. A Gamil account is created.
+2. Then an Instagram and Facebook account can be created.
 
-[Solution details to be added]
+### Component 2: Costumizing Accounts
+
+1. A lot of posts must be created, so it is a little bit of a challenge to get the flags.
+2. Also the description should be made. Here it contains a hint to the flag.
+3. All posts should contain descriptions.
+
+**HAVE FUN**
+
+## Challenge Writeup
+
+### Step 1: Tagged flag
+
+- As the name of this person is known, a simple search on Instagram gets us her account.
+- Looking through her posts, a image with a tag is found. The tag is the flag and also formatted like one.
+
+### Step 2: Caption
+
+-  When looking through the captions of her posts, it gets clear that her favourite place to visit is Budapest.
+
+### Step 3: Birthday
+
+- Looking at her username we can see the number 76. When thinking about it, a lot of people use their birthday in their username and Tanja did so too. With this we have the day and the month. The only thing that is missing is the year and this we can get by doing the math because she states in her caption how old she is.
+
+### Tools Used
+
+* Instagram
+
+### Conclusion
+Sometimes a little bit of research can lead to a lot of information of a person.

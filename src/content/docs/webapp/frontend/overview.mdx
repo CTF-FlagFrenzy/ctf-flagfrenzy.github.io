@@ -3,21 +3,81 @@ title: Frontend Architecture
 description: Overview of the CTF FlagFrenzy frontend implementation
 ---
 
-# Frontend Architecture
-
-The CTF FlagFrenzy frontend is built using modern web technologies to provide a responsive and intuitive user experience.
+The CTF FlagFrenzy frontend is built using SvelteKit, in combination with Tailwind CSS.
 
 ## Technology Stack
 
-- React for component-based UI
+- SvelteKit for UI
 - TypeScript for type safety
 - Tailwind CSS for styling
-- Redux for state management
+- Chart JS for the graph
 
-## Key Components
+## Folder Tree
+Here you can see the folder tree of the flagfrenzy-sveltekit. These are only the files and folders that are important for the design of the frontend, so the overall folder tree is much bigger. The tailwind.config.js is where Tailwind can be customized. The postcss.config.js is important for the post apply of css parts. In the static folder are the favicon and images stored. The src folder is where all the html, css and svelte pages are stored. In the lib/components folder are all svelte pages which are only used in other pages like the Footer.svelte, which is used in the + layout.svelte.
+```tree
+│   DockerFile
+│   .env
+│   tailwind.config.js
+│   postcss.config.js
+├───static
+│   │   favicon.png
+│   └───images
+└───src
+    │   app.css
+    │   app.html
+    ├───lib
+    │   └───components
+    │       │   card.svelte
+    │       │   Footer.svelte
+    │       │   ...
+    └───routes
+        │   +error.svelte
+        └───(protected)
+            │   +layout.svelte
+            │   +page.svelte
+            ├───scoreboard
+            │   │   +page.svelte
+            └───...
+```
 
-- **Authentication Module**: Handles user login, registration, and session management
-- **Challenge Explorer**: Provides an interface for browsing and selecting challenges
-- **Submission Interface**: Allows users to submit flags and view results
-- **Scoreboard**: Real-time display of competition standings
-- **Admin Dashboard**: Configuration and monitoring for event administrators
+## About Us Page
+This is the page where the project team is presented. It starts with a group picture of all, which is followed by the management section containing the text of the project supervisor and the project leader and their images. After this there are two sections for each team, each with a slider. A slide contains the information about one team member.
+
+### Functions
+This are the most important functions of the page.
+
+| Function | Description | Note |
+|------------|------------|------------|
+| nextSlide1 / nextSlide2 | Functions to switch between the slides | Number after the % to the number of slides |
+
+### Variables
+This are the most important variables of the page.
+
+| Variable | Description | Note |
+|------------|------------|------------|
+| slides1 / slides2 | Contain the data for every slide. | Default is 1 minute |
+| interval1 / interval2 | The time until the slider turn to next slide. | Default is 10 seconds |
+
+## Admin Page
+This page is only accessible for the members who are part of the adminUser array, which is located in the same folder as this page but in the +page.server.js . The page starts with a more detailed version of the grpah of the scoreboard, followed by a list of solved challenges, a list of shared flags and at last the list of running challenges with the option to deprovision them.
+
+### Functions
+This are the most important functions of the page.
+
+| Function | Description | Note |
+|------------|------------|------------|
+| loadAllFlags | Loads every flag from the anti-cheat |  |
+| loadNotSolved | Loads all start challenge entrys which are not solved. |  |
+| deprovision | Deprovisions the spefic container. | By clicking the button of the entry in running challenge list |
+| loadGraphValue | Loads the data for the graph. | Moves the gathered data forward to the graph.svelte |
+| checkAdmin | Checks if the user is part of the adminUser array. |  |
+
+### Variables
+This are the most important variables of the page.
+
+| Variable | Description | Note |
+|------------|------------|------------|
+| interval | The time until the data is automatically refreshed. | Default is 1 minute |
+
+## Error Page
+Prints out the error and the status code. It also hides that there is a admin page incase somebody tries to enter the page but is not allowed.

@@ -1,0 +1,222 @@
+---
+title: Cluster | Deploy Challenges
+description: Deploying Challenges on the CTF FlagFrenzy Cluster
+---
+
+Some Text
+
+## 🧠 Context and Reasoning
+
+These scripts and Kubernetes templates are the core components executed by the FastAPI deployment service (`cluster/fastapi-endpoints.mdx`) to manage the lifecycle of challenge instances within the K3s cluster. They use environment variables (populated by the API call) and standard tools (`envsubst`, `kubectl`) to create, configure, and delete resources dynamically.
+
+## 🧱 Architecture Overview (Placeholder)
+
+*(Placeholder: Show the flow: API receives request -> sets ENV VARS -> calls script (`deploy.sh`) -> `envsubst` populates `deployment.yml`/`ingress.yml` -> `kubectl apply` creates resources in K3s.)*
+
+## 🛠️ Implementation Steps (Scripts and Templates)
+
+These files reside within the `app/` directory of the FastAPI service (`~/fastapi-deployment-api/app` on the master nodes).
+
+1.  **`teamkey.sh`:** Creates a namespace and a secret for a team.
+    ```bash
+    #!/bin/bash
+
+    # Input parameters from API
+    IN_TEAMID=$1
+    IN_TEAMKEY=$2
+
+    # Export for envsubst or direct use
+    export TEAMID=$IN_TEAMID
+    export TEAMKEY=$IN_TEAMKEY
+
+    printf 'Setting up environment for team '$TEAMID'...\n\n'
+
+    # Create team-specific namespace (fails if exists)
+    kubectl create namespace namespace-team-$TEAMID
+
+    # Create secret containing the team key (fails if exists)
+    kubectl create secret generic teamkey-$TEAMID \
+      --from-literal=TEAMKEY=$TEAMKEY \
+      -n namespace-team-$TEAMID
+
+    # Output information about the created secret
+    kubectl describe secret teamkey-$TEAMID -n namespace-team-$TEAMID
+
+    printf '\nDone!\n'
+    # Output confirmation (parsed by API)
+    printf 'TEAMKEY secret created for team %s\n' "$TEAMID"
+
+    ```
+
+2.  **`deployment.yml`:** Kubernetes Deployment and Service template. Uses `${VAR}` syntax for `envsubst`.
+    ```yaml
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      # Unique name using team and challenge
+      name: deployment-${TEAMID}-${CHALLENGE}
+      # Deploy into team-specific namespace
+      namespace: namespace-team-${TEAMID}
+      labels:
+        app: ${CHALLENGE}
+        team: '${TEAMID}' # Labels used by Service selector
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: ${CHALLENGE}
+          team: '${TEAMID}'
+      template:
+        metadata:
+          labels:
+            app: ${CHALLENGE}
+            team: '${TEAMID}'
+        spec:
+          containers:
+          - name: ${CHALLENGE}
+            # Image name assumes convention: registry:5000/<challenge_name>
+            image: web.ctf.htl-villach.at:5000/${CHALLENGE} # Use FQDN of registry
+            ports:
+            - containerPort: 80 # Default port, adjust if challenge uses different port
+            env:
+            # Inject team key from the secret created by teamkey.sh
+            - name: TEAMKEY
+              valueFrom:
+                secretKeyRef:
+                  name: teamkey-${TEAMID} # Secret name convention
+                  key: TEAMKEY # Key within the secret
+            resources: # Add resource limits/requests
+              requests:
+                memory: "128Mi" # Example
+                cpu: "100m" # Example
+              limits:
+                memory: "256Mi" # Example
+                cpu: "250m" # Example
+          # Reference the secret needed to pull from private registry
+          imagePullSecrets:
+          - name: registry-credentials # Assumes secret exists in the namespace or is cluster-wide
+    ---
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: service-${TEAMID}-${CHALLENGE}
+      namespace: namespace-team-${TEAMID}
+    spec:
+      selector:
+        # Must match pod labels
+        app: ${CHALLENGE}
+        team: '${TEAMID}'
+      ports:
+      - protocol: TCP
+        port: 80 # Service port
+        targetPort: 80 # Port on the container (must match containerPort)
+      # type: ClusterIP # Default type is fine
+    ```
+
+3.  **`ingress.yml`:** Kubernetes Ingress template. Uses `${VAR}` syntax for `envsubst`.
+    ```yaml
+    apiVersion: networking.k8s.io/v1
+    kind: Ingress
+    metadata:
+      name: ingress-${TEAMID}-${CHALLENGE}
+      namespace: namespace-team-${TEAMID}
+      annotations:
+        # Annotation for Traefik (default ingress in K3s) might be needed depending on config
+        # Example: kubernetes.io/ingress.class: "traefik"
+        # The nginx annotation below is for Kubernetes Nginx Ingress, not Traefik usually.
+        # Remove if using Traefik unless specifically configured.
+        # nginx.ingress.kubernetes.io/rewrite-target: /
+    spec:
+      rules:
+      # Host uses the generated unique subdomain
+      - host: "${SUBDOMAIN}.web.ctf.htl-villach.at" # Domain from deploy.sh
+        http:
+          paths:
+          - path: / # Match all paths
+            pathType: Prefix
+            backend:
+              service:
+                # Points to the service created in deployment.yml
+                name: service-${TEAMID}-${CHALLENGE}
+                port:
+                  number: 80 # Port exposed by the service
+      # tls: # Optional: Configure TLS directly on Ingress if needed
+      # - hosts:
+      #   - "${SUBDOMAIN}.web.ctf.htl-villach.at"
+      #   secretName: <tls-secret-name> # Requires a TLS secret in the namespace
+    ```
+
+4.  **`deploy.sh`:** Orchestrates deployment using templates and `kubectl`.
+    ```bash
+    #!/bin/bash
+
+    # Input parameters from API
+    IN_TEAMID=$1
+    IN_CHALLENGE=$2
+
+    # Export variables for envsubst
+    export TEAMID=$IN_TEAMID
+    export CHALLENGE=$IN_CHALLENGE
+    # Generate a unique but deterministic subdomain based on team/challenge
+    export SUBDOMAIN=$(echo "Attention: Team '$TEAMID' wants to steal the recipe for '$CHALLENGE'-cookies" | md5sum | cut -f1 -d" ")
+
+    printf 'Deploying challenge "%s" for team %s...\n\n' "$CHALLENGE" "$TEAMID"
+
+    # Ensure namespace exists (create if not, ignore error if exists)
+    kubectl create namespace namespace-team-$TEAMID --dry-run=client -o yaml | kubectl apply -f -
+
+    # Apply Deployment and Service manifest
+    envsubst < deployment.yml | kubectl apply -f - -n namespace-team-$TEAMID
+
+    # Apply Ingress manifest
+    envsubst < ingress.yml | kubectl apply -f - -n namespace-team-$TEAMID
+
+    printf '\nDone!\n'
+    printf '\nExposing challenge at...\n'
+    # Output the URL (parsed by the API)
+    printf 'https://%s.web.ctf.htl-villach.at\n' "$SUBDOMAIN"
+    ```
+
+5.  **`deprovision.sh`:** Deletes resources associated with a challenge instance.
+    ```bash
+    #!/bin/bash
+
+    # Input parameters from API
+    IN_TEAMID=$1
+    IN_CHALLENGE=$2
+
+    # Export variables for resource naming consistency (optional here, used in printf)
+    export TEAMID=$IN_TEAMID
+    export CHALLENGE=$IN_CHALLENGE
+
+    printf 'Deprovisioning challenge "%s" for team %s...\n\n' "$CHALLENGE" "$TEAMID"
+
+    # Delete resources by name in the specific namespace
+    kubectl delete deployment deployment-${TEAMID}-${CHALLENGE} -n namespace-team-$TEAMID --ignore-not-found=true
+    kubectl delete service service-${TEAMID}-${CHALLENGE} -n namespace-team-$TEAMID --ignore-not-found=true
+    kubectl delete ingress ingress-${TEAMID}-${CHALLENGE} -n namespace-team-$TEAMID --ignore-not-found=true
+
+    # Optional: Delete namespace if no other challenges for the team exist
+    # kubectl delete namespace namespace-team-$TEAMID --ignore-not-found=true
+
+    printf '\nDone!\n'
+    printf '\nAll resources removed for challenge "%s" by team %s.\n' "$CHALLENGE" "$TEAMID"
+
+    ```
+
+## ⚠️ Tips, Caveats, Troubleshooting
+
+* **`envsubst`:** Requires the `gettext` package (`apt-get install gettext`). It replaces `${VAR}` or `$VAR` found in the template files with the values of exported environment variables.
+* **Permissions:** The `kubectl` command executed by these scripts needs sufficient RBAC permissions to create/delete namespaces, secrets, deployments, services, and ingresses. See `cluster/secrets.mdx`.
+* **`imagePullSecrets`:** The `deployment.yml` references `registry-credentials`. This secret must exist in the `namespace-team-${TEAMID}` namespace *before* the pod tries to pull the image. You might need to copy/create this secret as part of `teamkey.sh` or `deploy.sh`, or grant the namespace's default service account permissions to a cluster-wide secret. The example in `K3s-Cluster-Setup.md` created it cluster-wide initially, but RBAC might prevent pods from using it directly without explicit permission. Copying it into the namespace is often simpler:
+    ```bash
+    # Add to deploy.sh or teamkey.sh after namespace creation
+    kubectl get secret registry-credentials -n default -o yaml | sed 's/namespace: default/namespace: namespace-team-'$TEAMID'/' | kubectl apply -f -
+    ```
+* **Ingress Controller:** The `ingress.yml` assumes Traefik (K3s default) is watching Ingress resources across namespaces. Ensure Traefik is running (`kubectl get pods -n kube-system`). Annotations might be needed depending on specific Traefik configuration. The `nginx.ingress.kubernetes.io/rewrite-target` annotation is typically for the Nginx Ingress Controller, not Traefik, and can likely be removed.
+* **Subdomain Generation:** The `md5sum` approach generates a unique subdomain. Ensure the wildcard DNS entry (`*.web.ctf.htl-villach.at`) points to the Load Balancer.
+* **Error Handling:** The bash scripts have minimal error handling (`kubectl delete --ignore-not-found=true`). Consider adding `set -e` to exit on error or more robust checks.
+
+## 📄 Clear Formatting, Tested Shell/YAML Blocks
+
+Scripts and templates are provided. Ensure `kubectl` is in the path within the FastAPI container and the kubeconfig is correctly mounted and configured.

@@ -1,0 +1,399 @@
+---
+title: "CTF Blockchain-Challenge | Solana Dumb Contract: Expert Level"
+description: Solana Dumb Contract challenge
+---
+
+Solana Dumb Contract is a blockchain CTF challenge that tests your understanding of Solana smart contracts and their interaction patterns. The challenge involves interacting with a deployed Solana program that stores a flag behind simple access control mechanisms.
+
+## Technical Implementation
+
+### Architecture
+The challenge consists of two main components:
+
+1. **Smart Contract**: A Rust program deployed on the Solana blockchain
+2. **Client Interaction**: TypeScript code that interacts with the contract
+
+### Component 1: Smart Contract
+
+The Solana program is written in Rust and implements basic flag storage with access control mechanisms.
+
+#### Contract Structure
+
+```rust
+use solana_program::{
+    account_info::{next_account_info, AccountInfo},
+    entrypoint,
+    entrypoint::ProgramResult,
+    msg,
+    program_error::ProgramError,
+    pubkey::Pubkey,
+    program_pack::{IsInitialized, Pack, Sealed},
+    hash::{hash, Hash},
+};
+use arrayref::{array_ref, array_refs, array_mut_ref, mut_array_refs};
+use borsh::{BorshDeserialize, BorshSerialize};
+
+// State structure
+#[derive(BorshSerialize, BorshDeserialize, Debug)]
+pub struct FlagState {
+    pub admin: Pubkey,
+    pub flag_hash: [u8; 32],
+    pub unlocked: bool,
+}
+
+// Program entrypoint
+entrypoint!(process_instruction);
+
+pub fn process_instruction(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    instruction_data: &[u8],
+) -> ProgramResult {
+    // Instruction processing logic
+}
+```
+
+#### State Management
+
+The contract maintains state in a `FlagState` structure with the following implementation:
+
+```rust
+impl Pack for FlagState {
+    const LEN: usize = 32 + 32 + 1; // Admin (32) + Flag Hash (32) + Unlocked (1)
+
+    fn unpack_from_slice(src: &[u8]) -> Result<Self, ProgramError> {
+        let src = array_ref![src, 0, 32 + 32 + 1];
+        let (admin_bytes, flag_hash_bytes, unlocked_bytes) = array_refs![src, 32, 32, 1];
+
+        Ok(FlagState {
+            admin: Pubkey::new_from_array(*admin_bytes),
+            flag_hash: *flag_hash_bytes,
+            unlocked: unlocked_bytes[0] != 0,
+        })
+    }
+
+    fn pack_into_slice(&self, dst: &mut [u8]) {
+        let dst = array_mut_ref![dst, 0, 32 + 32 + 1];
+        let (admin_dst, flag_hash_dst, unlocked_dst) = mut_array_refs![dst, 32, 32, 1];
+
+        admin_dst.copy_from_slice(self.admin.as_ref());
+        flag_hash_dst.copy_from_slice(&self.flag_hash);
+        unlocked_dst[0] = self.unlocked as u8;
+    }
+}
+```
+
+#### Instruction Implementation
+
+The contract supports three key instructions:
+
+1. **Initialize** (Empty instruction data)
+```rust
+if instruction_data.is_empty() {
+    msg!("Initializing...");
+    flag_state.admin = *signer_account.key;
+    flag_state.flag_hash = hash(b"FF{e7aa71973d5c4703ef39648833eb8c892dfsdf402edc52b7a2944ad9830b22dac}").to_bytes();
+    flag_state.unlocked = false;
+    FlagState::pack_into_slice(&flag_state, &mut flag_account.data.borrow_mut());
+    return Ok(());
+}
+```
+
+2. **Unlock Flag** (Instruction data: `[1]`)
+```rust
+if signer_account.key == &flag_state.admin && instruction_data.len() == 1 && instruction_data[0] == 1 {
+    msg!("Unlock");
+    flag_state.unlocked = true;
+    FlagState::pack_into_slice(&flag_state, &mut flag_account.data.borrow_mut());
+    return Ok(());
+}
+```
+
+3. **Retrieve Flag** (Instruction data: `[2]`)
+```rust
+if instruction_data.len() == 1 && instruction_data[0] == 2 && flag_state.unlocked {
+    msg!("FF{e7aa71973d5c4703ef39648833eb8c892dfsdf402edc52b7a2944ad9830b22dac}");
+    return Ok(());
+}
+```
+
+#### Security Mechanisms
+
+The contract implements several security mechanisms:
+
+1. **Admin Check**: Only the admin account can unlock the flag
+2. **State Validation**: The flag can only be retrieved after explicitly unlocking it
+3. **Program Logic**: The contract follows a specific sequence of operations that must be followed
+
+#### Flag Storage
+
+The flag is embedded directly in the contract code:
+```
+FF{e7aa71973d5c4703ef39648833eb8c892dfsdf402edc52b7a2944ad9830b22dac}
+```
+
+### Component 2: Client Interaction
+
+To interact with the deployed Solana program, a TypeScript client is provided as a reference:
+
+```typescript
+import * as web3 from '@solana/web3.js';
+
+async function interactWithContract() {
+    // Connect to the Solana network
+    const connection = new web3.Connection(web3.clusterApiUrl('devnet'));
+    
+    // Replace with your program ID
+    const programId = new web3.PublicKey("JAZcYm2mHoEwuPz7wAv4xG8o48gCtwXv7FNbj7Bt88z");
+    
+    // Create or import a keypair for the payer account
+    const payer = web3.Keypair.generate();
+    
+    // Create a keypair for the flag account
+    const flagAccount = web3.Keypair.generate();
+    
+    // Calculate the minimum lamports needed for rent exemption
+    const lamports = await connection.getMinimumBalanceForRentExemption(65); // 32 + 32 + 1 = FlagState::LEN
+    
+    // Create the flag account
+    const createAccountInstruction = web3.SystemProgram.createAccount({
+        fromPubkey: payer.publicKey,
+        newAccountPubkey: flagAccount.publicKey,
+        lamports,
+        space: 65,
+        programId,
+    });
+    
+    // Send transaction to create the account
+    await web3.sendAndConfirmTransaction(
+        connection, 
+        new web3.Transaction().add(createAccountInstruction), 
+        [payer, flagAccount]
+    );
+    
+    // Initialize the contract
+    const initInstruction = new web3.TransactionInstruction({
+        keys: [
+            { pubkey: flagAccount.publicKey, isSigner: false, isWritable: true },
+            { pubkey: payer.publicKey, isSigner: true, isWritable: true }
+        ],
+        programId,
+        data: Buffer.from([]),
+    });
+    
+    await web3.sendAndConfirmTransaction(
+        connection, 
+        new web3.Transaction().add(initInstruction), 
+        [payer]
+    );
+    
+    // Unlock the flag
+    const unlockInstruction = new web3.TransactionInstruction({
+        keys: [
+            { pubkey: flagAccount.publicKey, isSigner: false, isWritable: true },
+            { pubkey: payer.publicKey, isSigner: true, isWritable: true }
+        ],
+        programId,
+        data: Buffer.from([1]),
+    });
+    
+    await web3.sendAndConfirmTransaction(
+        connection, 
+        new web3.Transaction().add(unlockInstruction), 
+        [payer]
+    );
+    
+    // Retrieve the flag
+    const retrieveFlagInstruction = new web3.TransactionInstruction({
+        keys: [
+            { pubkey: flagAccount.publicKey, isSigner: false, isWritable: false },
+            { pubkey: payer.publicKey, isSigner: true, isWritable: true }
+        ],
+        programId,
+        data: Buffer.from([2]),
+    });
+    
+    await web3.sendAndConfirmTransaction(
+        connection, 
+        new web3.Transaction().add(retrieveFlagInstruction), 
+        [payer]
+    );
+    
+    // To see the flag, you need to check the transaction logs
+    console.log("Check transaction logs for the flag");
+}
+```
+
+#### Client Workflow:
+
+1. **Account Creation**
+   - Creates two keypairs: one for the payer and one for the flag account
+   - Allocates sufficient lamports for rent exemption
+   - Sets up the account with correct space allocation (65 bytes)
+
+2. **Initialization**
+   - Sends an empty instruction to trigger the initialization code path
+   - This sets the caller as the admin and initializes the flag state
+
+3. **Unlocking the Flag**
+   - Sends instruction data `[1]` to unlock the flag
+   - Must be called by the same account that initialized the contract
+
+4. **Retrieving the Flag**
+   - Sends instruction data `[2]` to retrieve the flag
+   - Only works if the flag has been unlocked
+
+### Contract Deployment
+
+To deploy the Solana Dumb Contract, follow these steps:
+
+#### Prerequisites
+- Install Rust and Cargo
+- Install Solana CLI tools
+- Set up a Solana network connection (devnet/testnet)
+
+#### Build and Deploy Steps
+
+1. **Build the Program**
+```bash
+# In the directory containing lib.rs
+cargo build-bpf
+```
+
+2. **Deploy to Solana**
+```bash
+solana program deploy target/deploy/solana_dumb_contract.so
+```
+
+3. **Note the Program ID**
+The deployment will output a Program ID that you'll need for client interactions.
+
+**HAVE FUN**
+
+## Challenge Writeup 1: Using Solana CLI
+
+This solution demonstrates how to solve the challenge using the Solana CLI directly.
+
+### Step 1: Setup Environment
+
+Configure the Solana CLI for the devnet cluster:
+
+```bash
+solana config set --url devnet
+```
+
+### Step 2: Create Keypairs
+
+Generate the necessary keypairs for interaction:
+
+```bash
+# Create a keypair for the payer
+solana-keygen new -o payer.json
+
+# Fund the account
+solana airdrop 2 $(solana address -k payer.json)
+
+# Create a keypair for the flag account
+solana-keygen new -o flag_account.json
+```
+
+### Step 3: Create the Flag Account
+
+Initialize the flag account with sufficient space:
+
+```bash
+solana create-account \
+  --from payer.json \
+  --keypair flag_account.json \
+  --lamports $(solana minimum-balance-for-rent-exemption 65) \
+  --space 65 \
+  --program-id JAZcYm2mHoEwuPz7wAv4xG8o48gCtwXv7FNbj7Bt88z
+```
+
+### Step 4: Initialize the Contract
+
+Send an empty instruction to initialize the contract:
+
+```bash
+solana program invoke \
+  --program-id JAZcYm2mHoEwuPz7wAv4xG8o48gCtwXv7FNbj7Bt88z \
+  --keypair payer.json \
+  '' \
+  $(solana address -k flag_account.json) \
+  $(solana address -k payer.json)
+```
+
+### Step 5: Unlock the Flag
+
+Send instruction data `[1]` to unlock the flag:
+
+```bash
+solana program invoke \
+  --program-id JAZcYm2mHoEwuPz7wAv4xG8o48gCtwXv7FNbj7Bt88z \
+  --keypair payer.json \
+  '01' \
+  $(solana address -k flag_account.json) \
+  $(solana address -k payer.json)
+```
+
+### Step 6: Retrieve the Flag
+
+Send instruction data `[2]` to retrieve the flag:
+
+```bash
+solana program invoke \
+  --program-id JAZcYm2mHoEwuPz7wAv4xG8o48gCtwXv7FNbj7Bt88z \
+  --keypair payer.json \
+  '02' \
+  $(solana address -k flag_account.json) \
+  $(solana address -k payer.json)
+```
+
+### Step 7: View the Flag
+
+Check the program logs to see the flag:
+
+```bash
+solana logs | grep "FF{"
+```
+
+The flag is: `FF{e7aa71973d5c4703ef39648833eb8c892dfsdf402edc52b7a2944ad9830b22dac}`
+
+## Challenge Writeup 2: Analyzing the Contract Source Code
+
+For a quicker solution, we can analyze the source code directly.
+
+### Step 1: Inspect Program Logic
+
+Examining the program's instruction logic:
+
+```rust
+if instruction_data.len() == 1 && instruction_data[0] == 2 && flag_state.unlocked {
+    msg!("FF{e7aa71973d5c4703ef39648833eb8c892dfsdf402edc52b7a2944ad9830b22dac}");
+    return Ok(());
+}
+```
+
+### Step 2: Extract the Flag
+
+The flag is hardcoded in the program as a message that is printed when the retrieve flag instruction is called:
+
+```
+FF{e7aa71973d5c4703ef39648833eb8c892dfsdf402edc52b7a2944ad9830b22dac}
+```
+
+### Alternative: Binary Analysis
+
+If only the compiled program is available, we can:
+
+1. Dump the program binary from the blockchain:
+```bash
+solana program dump JAZcYm2mHoEwuPz7wAv4xG8o48gCtwXv7FNbj7Bt88z program_dump/dumb_contract.so
+```
+
+2. Extract strings from the binary:
+```bash
+strings program_dump/dumb_contract.so | grep -i "FF{"
+```
+
+This would also reveal the flag without needing to execute the program.

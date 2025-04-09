@@ -1,17 +1,62 @@
 ---
-title: Infrastructure Overview
-description: Overview of the CTF FlagFrenzy infrastructure
+title: Cluster | Overview
+description: Overview of the CTF FlagFrenzy Cluster
 ---
 
-# Infrastructure Overview
+Some Text
 
-CTF FlagFrenzy is built on a modern, containerized infrastructure designed for scalability, security, and reliability.
+## 🧠 Context and Reasoning
 
-## Core Components
+Kubernetes provides a robust platform for automating deployment, scaling, and management of containerized applications. K3s was chosen for this project due to its lightweight nature, ease of installation, and lower resource requirements compared to full K8s distributions, making it suitable for lab or resource-constrained environments.
 
-- Kubernetes (K3s) for container orchestration
-- Docker for containerization
-- Traefik for ingress control
-- Prometheus and Grafana for monitoring
-- PostgreSQL for persistent data storage
-- Redis for caching and pub/sub
+The cluster is designed with High Availability (HA) in mind for the control plane by using an external MySQL database to store the cluster state, allowing multiple master nodes to operate concurrently. A load balancer sits in front of the master nodes to provide a stable endpoint for the Kubernetes API server.
+
+Agent nodes are responsible for running the actual workloads (CTF challenges). They connect to the control plane via the load balancer and pull necessary images from the private Docker registry.
+
+## 🧱 Architecture Overview (Placeholder)
+
+*(Placeholder: Add a diagram showing: Load Balancer -> [Master1, Master2] (connected to external MySQL DB), Load Balancer -> [Agent1, Agent2, ...]. Show connections to Private Registry and interaction via `kubectl`)*
+
+**Key Components:**
+
+* **Load Balancer (Nginx):**
+    * Provides a stable Virtual IP (VIP) for the K3s API server (TCP port 6443) via `stream` block load balancing.
+    * Proxies HTTP/HTTPS traffic (port 80/443) to the K3s Ingress Controller (Traefik) for accessing deployed applications.
+    * Proxies requests to the custom FastAPI deployment API running on master nodes.
+    * Runs using Docker or Podman.
+* **External Datastore (MySQL):**
+    * Stores the K3s cluster state, enabling control plane HA.
+    * Runs as a container on the Load Balancer host (or could be a separate dedicated DB server).
+* **K3s Master Nodes (Servers):**
+    * Run the K3s control plane components (API server, controller manager, etc.).
+    * Connect to the external MySQL datastore.
+    * Are tainted (`CriticalAddonsOnly=true:NoExecute`) to generally prevent scheduling regular workloads on them.
+    * Host the FastAPI deployment service container.
+* **K3s Agent Nodes (Workers):**
+    * Run the Kubelet, Kube-proxy, and container runtime (containerd).
+    * Execute the application Pods (challenges).
+    * Are configured to pull images from the private Docker registry.
+* **Networking (Flannel):** K3s bundles Flannel as the default CNI (Container Network Interface) for pod networking.
+* **Ingress Controller (Traefik):** K3s bundles Traefik as the default Ingress controller, managing external access to services within the cluster.
+* **Container Runtime:** K3s uses `containerd`. Docker/Podman may be installed on nodes but K3s primarily interacts with `containerd`.
+
+## 🛠️ Implementation Steps
+
+1.  **Base Setup:** Install Docker or Podman on all nodes (`overview`).
+2.  **Load Balancer Setup:** Deploy Nginx and MySQL on the LB host (`cluster/init.mdx`).
+3.  **Master Node Setup:** Install K3s servers, configuring them to use the external DB and LB (`cluster/init.mdx`).
+4.  **Agent Node Setup:** Install K3s agents, configuring them to connect to the masters via the LB (`cluster/init.mdx`).
+5.  **Registry Integration:** Configure agents to trust and pull from the private registry (`cluster/internal-registry.mdx`).
+6.  **Tooling/Access:** Set up `kubectl` for cluster interaction, implement Dashboard (`cluster/dashboard.mdx`).
+
+## ⚠️ Tips, Caveats, Troubleshooting
+
+* Consistency in hostnames and IP addresses across configuration files (`/etc/hosts`, K3s install flags, Nginx config) is crucial.
+* Firewall rules must allow necessary traffic (K3s ports, MySQL port 3306, etc.).
+* The `K3S_TOKEN` must be identical on all master and agent nodes.
+* Using an external datastore adds complexity but enables HA. Ensure the DB is reliable and backed up.
+* Understanding K3s networking (Flannel, Service IPs, Traefik) is important for troubleshooting application access.
+
+## 📄 Clear Formatting, Tested Shell/YAML Blocks
+
+Detailed setup steps are provided in `cluster/init.mdx` and other relevant files.

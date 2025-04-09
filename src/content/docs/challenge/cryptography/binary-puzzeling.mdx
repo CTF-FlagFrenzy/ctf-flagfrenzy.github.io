@@ -1,24 +1,133 @@
 ---
-title: binary_puzzeling
-description: Binary Puzzeling challenge
+title: "CTF Crypto | Binary Puzzeling: Medium"
+description: "Writeup for the Binary Puzzeling CTF challenge."
 ---
 
-# Binary Puzzeling
+Binary Puzzeling is a Capture The Flag (CTF) challenge designed to test participants' ability to decipher a string encoded with XOR and reverse the encoding. The challenge involves a FastAPI service that provides an encoded string.
 
-## Challenge Description
+#### Directory Structure
 
-[Description of the Binary Puzzeling challenge]
+```
+Binary_Puzzeling
+├── Binary_Puzzeling.md
+├── docker-compose.yml
+├── Dockerfile
+├── requirements.txt
+├── writeup.md
+└── app
+    └── main.py
+```
 
-## Difficulty
 
-[Easy/Medium/Hard]
+## Technical Implementation
 
-## Hints
+### Architecture
 
-1. [Hint 1]
-2. [Hint 2]
-3. [Hint 3]
+The challenge uses a single service to serve and create the challenge:
 
-## Solution
+1.  **FastAPI Application** (`main.py`): Serves the encoded string and handles the challenge logic.
 
-[Solution details to be added]
+### Component 1: FastAPI Application (`main.py`)
+
+The `main.py` file includes the challenge string generation and the FastAPI service. It uses the `xor_strings(string1, string2)` function to encode the flag. The function converts the strings to binary, performs an XOR operation, and converts the result back into a string.
+
+#### Full Source Code:
+
+```python
+// filepath: c:\Users\Kave\Documents\Git\challenges\Binary_Puzzeling\app\main.py
+# setup
+...
+
+#Flag generation
+team_key = os.getenv("TEAMKEY")
+challenge_key = "k^kpB2Y99nKwhjex8!G1zn6RhnPtUZsQF0g&"
+combined_flag = challenge_key + team_key
+hashed_flag = f"FF{{{hashlib.sha256(combined_flag.encode()).hexdigest()}}}"
+
+#function to xor the flag
+def xor_strings(s1, s2):
+    # Ensure the strings are of the same length
+    if len(s1) != len(s2):
+        raise ValueError("Strings must be of the same length")
+
+    # Convert strings to binary and XOR them
+    xor_result = "".join(chr(ord(a) ^ ord(b)) for a, b in zip(s1, s2))
+
+    return xor_result
+
+#mask must be same length as hashed flag (sha256 -> 256 bit)
+mask = "What might this string be doing? Maybe it is a hint or something.lol"
+masked_string = xor_strings(mask, hashed_flag)
+
+...
+#debug
+...
+
+#write the data to a file that FastAPI can server
+with open("encoded.txt", "w") as f:
+    f.write(masked_string)
+    f.write(mask)
+
+app = FastAPI()
+
+#present the encoded string
+@app.get("/")
+def read_root():
+    return FileResponse("encoded.txt")
+
+...
+#debug
+
+```
+#### Key Features:
+
+1.  Generating a flag string
+2.  Making the encryped flag string available
+
+### Component 2: Containerization Application (`Dockerfile`)
+
+This ensures that flags are only generated at deployment, not at build. Prepares an python environment for the fastAPI
+
+
+#### Full Source Code:
+```
+FROM python:3.9
+WORKDIR /code
+COPY ./requirements.txt /code/requirements.txt
+RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
+COPY ./app /code/app
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "80"]
+```
+
+## Challenge Writeup
+
+### Step 1: [Step 1 Description]
+
+[Detailed explanation of the first step to solve the challenge]
+
+### Step 2: [Step 2 Description]
+
+[Detailed explanation of the second step to solve the challenge]
+
+### Step 3: [Step 3 Description]
+
+[Detailed explanation of the third step to solve the challenge]
+...
+
+### Step N: [Step N Description]
+
+[Detailed explanation of the final step to solve the challenge]
+
+### Key Insights
+
+1.  [Insight 1]
+2.  [Insight 2]
+3.  [Insight 3]
+    ...
+
+### Tools Used
+
+* [Tool 1]
+* [Tool 2]
+* [Tool 3]
+    ...

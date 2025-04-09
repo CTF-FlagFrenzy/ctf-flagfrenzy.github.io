@@ -1,35 +1,50 @@
 ---
-title: "CTF FlagFrenzy | The Neverending Zip Challenge: Easy Level"
+title: "CTF Reversing | The Neverending Zip Challenge: Easy Level"
 description: The Neverending Zip challenge
 ---
 
 The Neverending Zip is a CTF (Capture The Flag) challenge that tests participants' ability to automate the extraction of deeply nested ZIP files. This document provides technical details about the implementation and architecture of the challenge.
 
-### System Architecture
+#### Directory Structure
 
-The challenge consists of:
-1. A Flask web application
-2. A ZIP file generation script
-3. A containerized deployment environment
+```
+The_Neverending_Zip/
+├── docker-compose.yml       
+├── test_The_Neverending_Zip.md  
+├── The_Neverending_Zip.md   
+├── writeup.md             
+├── flask_app/
+│   ├── app.py              
+│   ├── create_zip.py        
+│   ├── Dockerfile          
+│   ├── requirements.txt   
+│   ├── unzip.py            
+│   ├── templates/
+│   │   └── index.html      
+│   ├── unzip/
+│   │   └── HaveFun.zip      
+│   └── zip/
+│       └── .gitkeep         
+```
 
-The application is containerized using Docker and deployed using Docker Compose, making it portable and easy to deploy consistently across different environments.
+## Technical Implementation
 
-## Components
+### Architecture
+The challenge consists of three main components:
 
-### 1. Flask Web Application (`flask_app/app.py`)
+1. **Flask Web Application** (`app.py`): Serves as the user interface and backend for the challenge
+2. **ZIP File Generator** (`create_zip.py`): Creates the deeply nested ZIP structure
+3. **Containerization** (`Dockerfile` and `docker-compose.yml`): Ensures consistent deployment
 
-The Flask application serves as the user interface and backend for the challenge. It handles:
+### Component 1: Flask Web Application (`flask_app/app.py`)
 
+This component is responsible for:
 - Presenting a web interface to users
 - Managing the ZIP file creation process
 - Providing real-time progress updates
 - Serving the generated ZIP file for download
 
-Key features of the Flask application:
-
-#### Status Management
-
-The application uses a status file to track the progress of ZIP creation:
+#### Full Source Code (Partial):
 
 ```python
 # Status file path
@@ -43,13 +58,7 @@ def read_status_file():
         except (json.JSONDecodeError, FileNotFoundError):
             pass
     return None
-```
 
-#### ZIP File Creation
-
-ZIP file creation is managed by a separate process:
-
-```python
 def create_zip_file():
     global zip_creation_in_progress, zip_creation_complete, zip_creation_start_time, estimated_total_time
     zip_creation_in_progress = True
@@ -72,13 +81,7 @@ def create_zip_file():
 
     zip_creation_in_progress = False
     zip_creation_complete = True
-```
 
-#### Real-time Progress Updates via Server-Sent Events (SSE)
-
-The application uses SSE to provide real-time updates about ZIP creation progress:
-
-```python
 @app.route("/stream")
 def stream():
     def generate():
@@ -103,13 +106,28 @@ def stream():
     return Response(generate(), mimetype="text/event-stream")
 ```
 
-### 2. ZIP File Generator (`flask_app/create_zip.py`)
+#### Key Features:
 
-The ZIP file generator is responsible for creating the deeply nested ZIP structure that forms the core challenge:
+1. **Status Management**
+   - Uses a JSON file to track ZIP creation progress
+   - Allows communication between the web app and ZIP generation process
 
-#### Flag Generation
+2. **Server-Sent Events (SSE)**
+   - Provides real-time progress updates to the client
+   - Streams status information without requiring page refreshes
 
-The flag is dynamically generated based on a challenge key and a team key:
+3. **Process Management**
+   - Launches the ZIP creation script as a separate process
+   - Monitors completion status and handles file serving
+
+### Component 2: ZIP File Generator (`flask_app/create_zip.py`)
+
+This component is responsible for:
+- Generating a unique flag based on challenge and team keys
+- Creating approximately 11,111 nested ZIP layers
+- Monitoring performance and providing status updates
+
+#### Full Source Code (Partial):
 
 ```python
 challengekey = "M5OQXpXsE^Us"
@@ -120,13 +138,7 @@ if not teamkey:
 
 combined_flag = challengekey + teamkey
 hashed_flag = "FF{" + hashlib.sha256(combined_flag.encode()).hexdigest() + "}"
-```
 
-#### ZIP Creation Process
-
-The script creates a deeply nested ZIP structure with approximately 11,111 layers:
-
-```python
 current_zip = inner_zip_path
 max_layers = 11111
 batch_size = 1000
@@ -143,50 +155,59 @@ for layer in range(1, max_layers + 1):
 
     # Delete the previous zip to save space
     os.remove(prev_zip)
+    
+    if layer % batch_size == 0:
+        # Display performance metrics every batch_size layers
+        current_time = time.time()
+        elapsed = current_time - start_time
+        layers_per_second = layer / elapsed if elapsed > 0 else 0
+        estimated_total = max_layers / layers_per_second if layers_per_second > 0 else 0
+        remaining = estimated_total - elapsed
+
+        # Update status file
+        if status_file and os.path.exists(os.path.dirname(status_file)):
+            try:
+                with open(status_file, "w") as f:
+                    json.dump(
+                        {
+                            "start_time": start_time,
+                            "current_time": current_time,
+                            "progress": layer / max_layers,
+                            "estimated_total_time": estimated_total,
+                            "remaining_time": remaining,
+                            "layers_per_second": layers_per_second,
+                        },
+                        f,
+                    )
+            except Exception as e:
+                logger.error(f"Error updating status file: {e}")
 ```
 
-#### Performance Monitoring and Status Updates
+#### Key Algorithms:
 
-The script tracks performance metrics and updates the status file:
+1. **Flag Generation**
+   - Combines a challenge key with a team-specific key
+   - Applies SHA-256 hashing to create a unique flag
+   - Formats it with the `FF{...}` wrapper
 
-```python
-if layer % batch_size == 0:
-    # Display performance metrics every batch_size layers
-    current_time = time.time()
-    elapsed = current_time - start_time
-    layers_per_second = layer / elapsed if elapsed > 0 else 0
-    estimated_total = max_layers / layers_per_second if layers_per_second > 0 else 0
-    remaining = estimated_total - elapsed
+2. **Nested ZIP Creation**
+   - Creates each layer in a loop up to 11,111 layers
+   - Uses a consistent naming scheme for internal files
+   - Deletes previous layers to conserve memory
 
-    # Update status file
-    if status_file and os.path.exists(os.path.dirname(status_file)):
-        try:
-            with open(status_file, "w") as f:
-                json.dump(
-                    {
-                        "start_time": start_time,
-                        "current_time": current_time,
-                        "progress": layer / max_layers,
-                        "estimated_total_time": estimated_total,
-                        "remaining_time": remaining,
-                        "layers_per_second": layers_per_second,
-                    },
-                    f,
-                )
-        except Exception as e:
-            logger.error(f"Error updating status file: {e}")
-```
+3. **Performance Monitoring**
+   - Calculates metrics like layers per second
+   - Estimates total time and remaining time
+   - Updates status file at regular intervals
 
-### 3. Web Interface (`flask_app/templates/index.html`)
+### Component 3: Web Interface (`flask_app/templates/index.html`)
 
 The web interface provides users with:
 - Information about the challenge
 - Real-time progress updates during ZIP creation
 - A download button when the ZIP is ready
 
-#### Progress Bar and Status Updates
-
-The interface uses JavaScript to update a progress bar and show status information:
+#### Code Sample:
 
 ```javascript
 eventSource.onmessage = function(event) {
@@ -234,163 +255,20 @@ eventSource.onmessage = function(event) {
 }
 ```
 
-### 4. Container Configuration (`docker-compose.yml` and `flask_app/Dockerfile`)
+#### Key Features:
+1. **Real-time Updates**
+   - Uses SSE to receive progress information
+   - Updates the progress bar and status message dynamically
 
-The challenge is containerized using Docker, with configuration defined in `docker-compose.yml`:
+2. **User Experience**
+   - Provides visual feedback on operation progress
+   - Automatically initiates download when ready
 
-```yaml
-version: '3'
+### Component 4: Containerization
 
-volumes:
-  my-django-data:
+The challenge is containerized using Docker for easy deployment and isolation.
 
-services:
-  flask:
-    build:
-      context: .
-      dockerfile: flask_app/Dockerfile
-
-    ports:
-      - '80:80'
-
-    environment:
-      - TEAMKEY=XXXXXXX
-```
-
-The `TEAMKEY` environment variable allows customization of the generated flag, making it possible to create unique flags for different teams or instances of the challenge.
-
-### 5. Extraction Helper Script (`flask_app/unzip.py`)
-
-This utility script demonstrates a proper approach for extracting the nested ZIP structure:
-
-```python
-def extract_nested_zips(zip_path, extract_dir):
-    """Recursively extract nested zip files until we find the flag."""
-    # Create extract directory if it doesn't exist
-    os.makedirs(extract_dir, exist_ok=True)
-
-    # Stats tracking
-    start_time = time.time()
-    layer_count = 0
-    last_report_time = start_time
-    report_interval = 5  # Report progress every 5 seconds
-
-    current_zip = zip_path
-
-    try:
-        while True:
-            layer_count += 1
-            current_extract_dir = os.path.join(extract_dir, f"layer_{layer_count}")
-            os.makedirs(current_extract_dir, exist_ok=True)
-
-            # Extract the current zip
-            with zipfile.ZipFile(current_zip, "r") as zipf:
-                zipf.extractall(current_extract_dir)
-
-                # Check if we found the flag
-                if "flag.txt" in zipf.namelist():
-                    flag_path = os.path.join(current_extract_dir, "flag.txt")
-                    logger.info(f"Found flag file at layer {layer_count}!")
-                    with open(flag_path, "r") as f:
-                        flag_content = f.read()
-                        logger.info(f"Flag content:\n{flag_content}")
-                    break
-
-                # Find the next zip file
-                next_zip = None
-                for item in zipf.namelist():
-                    if item.lower().endswith(".zip"):
-                        next_zip = os.path.join(current_extract_dir, item)
-                        break
-
-                if next_zip is None:
-                    logger.error("No zip file found in layer. Extraction complete but no flag found.")
-                    break
-
-                current_zip = next_zip
-```
-
-## Technical Challenges and Solutions
-
-### 1. Managing Memory Usage
-
-Creating and extracting deeply nested ZIP files could potentially consume excessive memory. Solutions implemented:
-
-- **During Creation**: The script deletes each previous ZIP layer after it's been incorporated into the next layer, maintaining a small memory footprint.
-  
-- **During Extraction**: The helper script can be configured to remove previous extraction layers as it progresses, preventing disk space exhaustion.
-
-### 2. Real-time Progress Updates
-
-Providing accurate progress updates for a process that may run for 15+ minutes is challenging:
-
-- **Server-Sent Events**: Used instead of WebSockets for simplicity and reliability
-- **Status File**: Shared between the web app and ZIP creation script
-- **Performance Metrics**: Calculation of layers per second and time remaining
-
-#### Real-time Progress Implementation Details
-
-```python
-# In create_zip.py - Progress reporting logic
-def update_status_file(status_file, start_time, layer, max_layers):
-    current_time = time.time()
-    elapsed = current_time - start_time
-    layers_per_second = layer / elapsed if elapsed > 0 else 0
-    estimated_total = max_layers / layers_per_second if layers_per_second > 0 else 0
-    remaining = estimated_total - elapsed
-    
-    try:
-        with open(status_file, "w") as f:
-            json.dump({
-                "start_time": start_time,
-                "current_time": current_time,
-                "progress": layer / max_layers,
-                "estimated_total_time": estimated_total,
-                "remaining_time": remaining,
-                "layers_per_second": layers_per_second,
-            }, f)
-    except Exception as e:
-        logger.error(f"Error updating status file: {e}")
-
-# In app.py - SSE endpoint implementation
-@app.route("/stream")
-def stream():
-    def generate():
-        while True:
-            # Check if zip file is ready
-            if os.path.exists(zip_path) or zip_creation_complete:
-                data = {"ready": True, "progress": 1.0}
-                yield f"data: {json.dumps(data)}\n\n"
-                break
-                
-            # Read and process status file
-            status = read_status_file()
-            if status and "progress" in status:
-                progress = status["progress"]
-                remaining = status.get("remaining_time", 0)
-                
-                data = {
-                    "ready": False,
-                    "progress": progress,
-                    "est_time_remaining": remaining,
-                    "layers_per_second": status.get("layers_per_second", 0)
-                }
-                yield f"data: {json.dumps(data)}\n\n"
-                
-            time.sleep(1)
-            
-    return Response(generate(), mimetype="text/event-stream")
-```
-
-### 3. Docker Containerization
-
-Containerization ensures consistent behavior across environments:
-
-- **Environment Variables**: Used for configurable elements like team keys
-- **Port Mapping**: Exposing port 80 for easy web access
-- **Resource Limits**: Can be applied to prevent resource exhaustion
-
-#### Dockerfile Implementation
+#### Dockerfile (`flask_app/Dockerfile`):
 
 ```dockerfile
 # flask_app/Dockerfile
@@ -422,7 +300,7 @@ RUN chmod +x flask_app/entrypoint.sh
 CMD ["./flask_app/entrypoint.sh"]
 ```
 
-#### Docker Compose Configuration
+#### Docker Compose (`docker-compose.yml`):
 
 ```yaml
 # docker-compose.yml
@@ -443,113 +321,44 @@ services:
         limits:
           cpus: '1'
           memory: 1G
-    # Healthcheck
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 15s
 ```
 
-#### Entrypoint Script
+#### Container Design:
 
-```bash
-#!/bin/bash
-# flask_app/entrypoint.sh
+1. **Base Image**
+   - Uses Python 3.9 slim as the foundation
+   - Provides a minimal but complete runtime environment
 
-# Wait for any system initialization
-sleep 2
+2. **Dependencies**
+   - Installs required packages from requirements.txt
+   - Includes Flask and supporting libraries
 
-# Start Gunicorn with 4 workers
-exec gunicorn --bind 0.0.0.0:80 --workers 4 --timeout 120 flask_app.app:app
-```
+3. **Environment Variables**
+   - TEAMKEY: Team-specific key used in flag generation
+   - Can be customized for each deployment
 
-## Security Considerations
+4. **Networking**
+   - Exposes port 80 for web traffic
 
-1. **Input Validation**: All user inputs are validated to prevent injection attacks
-2. **Resource Limitations**: The application includes timeouts and limits to prevent DoS attacks
-3. **Safe File Handling**: All file operations use secure practices to prevent directory traversal
-4. **Containerization**: Isolates the application from the host system
-
-### Security Implementation Examples
-
-```python
-# Input validation example
-@app.route("/custom_key", methods=["POST"])
-def set_custom_key():
-    key = request.form.get("key", "")
-    
-    # Validate key format
-    if not re.match(r'^[a-zA-Z0-9_-]{4,32}$', key):
-        return jsonify({"error": "Invalid key format"}), 400
-        
-    # Store validated key
-    session["custom_key"] = key
-    return jsonify({"success": True})
-
-# Safe file handling example
-def safe_path_join(base_dir, filename):
-    """Safely join base directory and filename, preventing directory traversal"""
-    # Normalize the path and ensure it stays within base_dir
-    path = os.path.normpath(os.path.join(base_dir, filename))
-    if not path.startswith(base_dir):
-        raise ValueError("Attempted path traversal")
-    return path
-
-# Resource limitation example - limit ZIP file size
-def validate_zip_file(zip_path, max_size_mb=100):
-    """Validate that a ZIP file is safe to extract"""
-    file_size_mb = os.path.getsize(zip_path) / (1024 * 1024)
-    if file_size_mb > max_size_mb:
-        raise ValueError(f"ZIP file too large: {file_size_mb:.2f}MB (max: {max_size_mb}MB)")
-        
-    # Additional validation could include checking number of files,
-    # checking for zip bombs, etc.
-```
-
-### Conclusion
-
-The Neverending Zip challenge demonstrates the importance of automation in dealing with repetitive tasks. By creating a deeply nested ZIP structure that would be practically impossible to navigate manually, it forces participants to develop programmatic solutions.
-
-The challenge balances technical complexity with educational value, teaching concepts related to:
-
-- File compression and extraction
-- Process automation
-- Real-time status reporting
-- Resource management
-- Web application development
+5. **Resource Management**
+   - Optional resource limits for CPU and memory
 
 **HAVE FUN**
 
 ## Challenge Writeup
 
-### Steps to Solve
+### Step 1: Download the Initial ZIP File
+When visiting the challenge website, you'll be redirected to download a file called `HaveFun.zip`.
 
-#### 1. Download the Initial ZIP File
-- Download the `HaveFun.zip` file from the web interface
-- This is just the beginning of the challenge - there are many layers beneath!
+### Step 2: Understand the Challenge Structure
+Examining the challenge reveals that:
+- The ZIP contains approximately 11,111 nested layers
+- Each ZIP file contains another ZIP file inside it
+- The flag is stored in a `flag.txt` file at the innermost layer
+- Manual extraction would be impractical, requiring automation
 
-#### 2. Understand the Challenge Structure
-- Examining the challenge reveals that:
-  - The ZIP contains approximately 11,111 nested layers
-  - Each ZIP file contains another ZIP file inside it
-  - The flag is stored in a `flag.txt` file at the innermost layer
-  - Manual extraction would be extremely impractical
-
-
-#### 3. Analyze the Challenge Creation Process
-From the `create_zip.py` file, we can understand how the challenge was constructed:
-- The flag is generated using a challenge key and team key
-- The formula used is:
-  ```python
-  combined_flag = challengekey + teamkey
-  hashed_flag = "FF{" + hashlib.sha256(combined_flag.encode()).hexdigest() + "}"
-  ```
-- The ZIP nesting is achieved through a loop that creates approximately 11,111 layers
-
-#### 4. Create an Automated Extraction Script
-Since manual extraction would take days, we need to create a Python script that can:
+### Step 3: Create an Automated Extraction Script
+We need to create a Python script that can recursively extract ZIP files until it finds the flag:
 
 ```python
 import os
@@ -609,7 +418,7 @@ def extract_nested_zips(zip_path, extract_dir):
                 
                 current_zip = next_zip
                 
-                # Clean up previous layer to save space (optional)
+                # Optional: Clean up previous layers to save disk space
                 # if layer_count > 1:
                 #     prev_layer_dir = os.path.join(extract_dir, f"layer_{layer_count-1}")
                 #     shutil.rmtree(prev_layer_dir, ignore_errors=True)
@@ -627,25 +436,38 @@ if __name__ == "__main__":
     extract_nested_zips(zip_path, extract_dir)
 ```
 
-#### 5. Run the Script and Wait
-- Execute the extraction script against the initial ZIP file
-- The script will navigate through all the nested ZIP layers
-- This could take some time (10-30 minutes depending on system performance)
-- Monitor the progress through the script's logging
+### Step 4: Execute the Solution
+Run the script and wait for it to process through all layers:
 
-#### 6. Retrieve the Flag
-Once the script reaches the core, it will find and open `flag.txt` which contains the flag in the format `FF{...}`.
+```bash
+python extract_nested_zips.py
+```
+
+The script will provide progress updates every 100 layers, showing:
+- The current layer count
+- Processing speed (layers per second)
+- Estimated time remaining
+
+### Step 5: Retrieve the Flag
+Once the script completes processing all ~11,111 layers, it will:
+- Find the `flag.txt` file in the innermost ZIP
+- Output the flag content to the console
+- The flag will be in the format: `FF{...}`
+
+### Key Insights
+1. The challenge tests automation skills and understanding of file extraction
+2. Memory management is crucial when dealing with many nested files
+3. Progress tracking helps maintain visibility during long-running operations
+4. Using Python's zipfile module simplifies the extraction process
 
 ### Tools Used
 - Python 3.x
-- Python's zipfile module
-- Text editor for script creation
+- zipfile module for ZIP file manipulation
+- logging module for progress tracking
+- os module for file path operations
 
-### Flag
-The final flag is in the format `FF{...}` which is a SHA-256 hash based on the challenge and team keys.
-
-### Lessons Learned
-1. Automation is essential when dealing with repetitive tasks at scale
-2. Understanding the challenge creation process can provide insights for efficient solution development
-3. Memory and storage management are important when processing many nested files
-4. There's a significant difference between theoretically possible manual solutions and practically feasible automated solutions
+### Solution Optimization
+For very large ZIP chains, consider these optimizations:
+- Delete extracted layers after processing to save disk space
+- Use a memory-efficient approach for very deep nesting
+- Implement proper error handling for corrupt ZIP files

@@ -1,0 +1,31 @@
+---
+title: Scoreboard Page
+description: Overview of the CTF FlagFrenzy Scoreboard Page and the relating components
+---
+
+## Scoreboard Page
+This pages shows the graph and the Top 10 table. For the graph the graph.svelte component is load into the page. The graph.svelte uses chart.js to create the interactive graph. It is possible to hover over points in the graph and see the respectve values. Also it is possible the hide teams from the graph by clicking their name in the legend.
+
+### Functions
+This are the most important functions of the page.
+
+| Function | Description | Note |
+|------------|------------|------------|
+| loadTeams | This is the function that loads the data for the Top 10 table. | All sorted by points |
+| loadGraphValue | This is the function that loads the daata for the graph.svelte. | List of point status for every 10 minutes per team |
+
+### Variables
+This are the most important variables of the page.
+
+| Variable | Description | Note |
+|------------|------------|------------|
+| interval | The time interval for next refresh of the data. | Default is 1 minute |
+
+### Functions graph.svelte
+This are the most important functions of the page.
+
+| Function | Description | Note |
+|------------|------------|------------|
+| groupDatabyTeams | This is the function that groups the entrys per team. | |
+| extractUniqueTimestamps | This is the function that alters the timestamp to match it for display on the webpage. | Only the hour and minutes are left behind |
+| createDatasets | Combines the labels and data. | Followed by creation of the graph |

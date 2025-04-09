@@ -1,24 +1,251 @@
 ---
-title: checking_encryption
-description: Checking Encryption challenge
+title: "CTF Reversing | Checking Encryption: Hard"
+description: A crypto challenge with the goal to decipher a string
 ---
 
-# Checking Encryption
+Checking Encryption is a Capture The Flag (CTF) challenge designed to test participants' ability to analyze and reverse-engineer custom encoding algorithms. The challenge involves decoding an obfuscated string that resembles a flag by understanding and reversing a custom "checksumming" algorithm.
 
-## Challenge Description
+#### Directory Structure
+```
+Checking_Encryption/
+├── docker-compose.yml
+├── Dockerfile
+├── requirements.txt
+├── app/main.py
+├── encoded.txt
+└── Checking_Encryption.md
+```
 
-[Description of the Checking Encryption challenge]
 
-## Difficulty
+## Technical Implementation
 
-[Easy/Medium/Hard]
+### Architecture
 
-## Hints
+The challenge uses a microservice architecture built with the following components:
 
-1. [Hint 1]
-2. [Hint 2]
-3. [Hint 3]
+1.  **Web Server** (`main.py`): A FastAPI application that serves the encoded string.
+2.  **Encoding Algorithm** (`main.py`): The custom checksumming algorithm that encodes the flag.
+3.  **Docker Environment** (`Dockerfile`, `docker-compose.yml`): Containerization for the challenge environment.
 
-## Solution
+### Component 1: Web Server (`main.py`)
 
-[Solution details to be added]
+The challenge uses FastAPI to serve the encoded string to participants. The server simply responds with the contents of the encoded.txt file when a request is made to the root endpoint.
+
+#### Key Features:
+
+1.  Simple HTTP endpoint to retrieve the encoded string
+2.  Dockerized environment for easy deployment
+3.  Environment variables for team and challenge keys
+
+### Component 2: Encoding Algorithm (`main.py`)
+
+The core of the challenge is the custom checksumming algorithm. This algorithm modifies the string by summing the Unicode values of every `n` characters (where `n` is the checksum interval) and replacing the last character in the group with the sum.
+
+#### Full Source Code:
+
+```python
+import hashlib
+import os
+
+from dotenv import load_dotenv
+from fastapi import FastAPI
+from fastapi.responses import FileResponse
+
+if os.environ.get("TEAMKEY") is None:
+    load_dotenv()
+
+team_key = os.getenv("TEAMKEY")
+challenge_key = os.getenv("CHALLENGE")
+combined_flag = challenge_key + team_key
+hashed_flag = f"FF{{{hashlib.md5(combined_flag.encode()).hexdigest()}}}"
+print(f"Team Key: {team_key}")
+print(f"Challenge Key: {challenge_key}")
+print(f"Flag: {hashed_flag}")
+
+
+def checksumming(message, checksum_interval=3):
+    if checksum_interval < 1:
+        print("Checksum interval must be at least 2")
+        return
+
+    result_message = ""
+    charIdx = 1
+    for char in message:
+        chached_char = char
+        # every third character gets checksummed. This means that its unicode
+        # value is combined with the unicode value of the 2 characters before it
+        # and then the result gets printed instead of the original character
+        if charIdx % checksum_interval == 0:
+            # get unicode sum of the current and the 2 before
+            sum = getStringUnicodeSum(message[charIdx - checksum_interval: charIdx])
+            # convert unicode to char
+            chached_char = chr(sum)
+            print(sum)
+        charIdx += 1
+        result_message += chached_char
+    return result_message
+
+
+def getStringUnicodeSum(characters=""):
+    if characters is None or characters == "":
+        return 0
+    sum = 0
+    for character in characters:
+        sum += ord(character)
+    return sum
+
+
+def convertToUnicode(message):
+    unicode_message = ""
+    for char in message:
+        unicode_message += str(ord(char)) + " "
+    return unicode_message
+
+
+def undoChecksumming(message, checksum_interval=3):
+    if checksum_interval < 1:
+        print("Checksum interval must be at least 2")
+        return
+    result_message = ""
+    charIdx = 1
+    for char in message:
+        chached_char = char
+        if charIdx % checksum_interval == 0:
+            # get unicode sum of the current and the 2 before
+            sum = getStringUnicodeSum(char) - getStringUnicodeSum(
+                message[charIdx - checksum_interval: charIdx - 1]
+            )
+            # convert unicode to char
+            chached_char = chr(sum)
+        charIdx += 1
+        result_message += chached_char
+    return result_message
+
+
+# this describes the difficultiy of the checksumming, higher numbers do
+# less modifications, therefore making it easier to figure out the
+# algorithm
+result = checksumming(hashed_flag, 4)
+print(result)
+result_unicode = convertToUnicode(result)
+result_reverted = undoChecksumming(result, 4)
+# print(result_unicode)
+# print(result_reverted)
+
+with open("encoded.txt", "w") as file:
+    file.write(result)
+
+
+app = FastAPI()
+
+
+@app.get("/")
+def read_root():
+    return FileResponse("encoded.txt")
+```
+
+#### Key Algorithms:
+
+1.  **checksumming**: Encodes a string by replacing every nth character with the Unicode sum of the group.
+2.  **undoChecksumming**: Decodes the string by reversing the checksumming process.
+3.  **getStringUnicodeSum**: Helper function to calculate the sum of Unicode values in a string.
+
+### Component 3: Docker Environment
+
+The challenge is containerized using Docker for easy deployment and consistent environment.
+
+#### Dockerfile:
+
+```yml
+FROM python:3.9
+
+WORKDIR /code
+
+COPY ./requirements.txt /code/requirements.txt
+
+RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
+
+COPY ./app /code/app
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "80"]
+```
+
+#### Docker Compose:
+
+```yml
+version: '3'
+
+services:
+  api:
+    build: .
+    ports:
+      - '8005:80'
+    environment:
+      - TEAMKEY=team2
+      - CHALLENGE=U#31!@cX
+```
+
+**HAVE FUN**
+
+## Challenge Writeup
+
+### Step 1: Retrieve the Encoded String
+
+Retrieve the encoded string from the FastAPI endpoint or the encoded.txt file. The string will look similar to `FF{Ľc1cĬca3Į1afĩ09bı4aeĲ52cü911þ0e0ł`.
+
+### Step 2: Analyze the Encoding Algorithm
+
+Understand the custom "checksumming" algorithm:
+1. The algorithm processes the string in groups of `n` characters (where `n` is the checksum interval, default is 4).
+2. For each group, it calculates the sum of the Unicode values of all characters.
+3. It replaces the last character in the group with the character corresponding to this sum.
+
+### Step 3: Implement the Decoding Algorithm
+
+Use the `undoChecksumming` function to reverse the encoding:
+
+```python
+def undoChecksumming(message, checksum_interval=4):
+    if checksum_interval < 1:
+        print("Checksum interval must be at least 2")
+        return
+    result_message = ""
+    charIdx = 1
+    for char in message:
+        chached_char = char
+        if charIdx % checksum_interval == 0:
+            # Get Unicode sum of the current and the characters before according to the checksum_interval
+            sum = getStringUnicodeSum(char) - getStringUnicodeSum(
+                message[charIdx-checksum_interval:charIdx-1]
+            )
+            # Convert Unicode to char
+            chached_char = chr(sum)
+        charIdx += 1
+        result_message += chached_char
+    return result_message
+```
+
+### Step 4: Decode the String and Retrieve the Flag
+
+Apply the decoding algorithm to the encoded string to retrieve the original flag.
+
+Example:
+```python
+encoded_string = "FF{Ľc1cĬca3Į1afĩ09bı4aeĲ52cü911þ0e0ł"
+decoded_string = undoChecksumming(encoded_string, 4)
+print(decoded_string)  # Will output the flag, e.g., FF{example_flag}
+```
+
+### Key Insights
+
+1.  The challenge tests understanding of Unicode character encoding
+2.  Custom encoding algorithms can often be reversed by understanding their mechanics
+3.  The checksumming interval is crucial for proper decoding
+4.  Indexing in the algorithm is 1-based, not 0-based, which is important to note
+
+### Tools Used
+
+* Python
+* FastAPI
+* Docker
+* Unicode character manipulation

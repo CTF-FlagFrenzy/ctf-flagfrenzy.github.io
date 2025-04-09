@@ -1,0 +1,42 @@
+---
+title: "CTF Backend | Database"
+description: Overview of the CTF FlagFrenzy database implementation
+---
+
+The Database saves all necessary information to run the CTF. 
+
+## Technology Stack
+
+- MySQL
+
+## Structure
+In the following figure you can see the ER-Diagram of the Database. For persistence it exists a volume for the database. To import the Challenges use the challenges.json file in the DB folder.
+![alt text](../../../../assets/backend/ER-Diagram.png)
+
+| Table Name | Foreign Key | Description |
+|------------|------------|-------------|
+| Teams | TeamLeader | Stores information about teams, including their name, key (random string length(24)), total points, password and number of members, sharedFlags, firstBloods. |
+| Users | TeamsID | Holds user data such as nickname, points, email, an avatar picture name, if the user is disabled and optionally links users to a team. The ID includes the name of the user and the class. |
+| User_made_challenges | User_ID, Challenges_ID | Tracks user progress on challenges, recording if they've solved it and if they are the first to do so, saving the URL of the deployed container. It is the Many-to-Many table between Users and Challenges. Saves also the URL for the Container of the Challenge and the creation time. |
+| Challenges | / | Contains details about challenges, including their name, a formatted name for the deployment, category, points, how often hints are used, descriptions, hints, the static flag, reference to another challenge, an attribute to determine if it’s a static challenge and difficulty. |
+| TeamPoints | TeamID | Contains the team with their points over time. It is important for the graph in the GUI, especially for the admin panel. |
+| TeamPointsUser | TeamID | Contains the team with their points over time. It is important for the graph in the GUI, especially for the user scoreboard. It makes an entry every 10 minutes. |
+
+### JSON Example
+Here you can see the Structure of the Database. You can import the Json entry in the database.
+```json
+{
+    "ID":  36,
+    "ChallengeName": "Hidden Job 4",
+    "Categorie": "Others",
+    "Points": 500,
+    "Description": "You stumbled upon a flyer… but is the organization behind it hiding something?",
+    "Difficulty": "Medium",
+    "Hint1": "Could the flyer be hiding something more?",
+    "Hint2": "What if the first flag holds the key to the second?",
+    "Hint3": "Run east, and you just might stumble upon a hidden boss.",
+    "Static": "Proj3ctD3ltA!sTh3B4st@ame!",
+    "FormatedChallengeName": "hidden-job",
+    "Chain": 35, 
+    "IsStatic": 1
+  },

@@ -1,24 +1,183 @@
 ---
-title: corrupted_file
-description: Corrupted File challenge
+title: "CTF Reversing | Corrupted File: Medium"
+description: A challenge involving identification and correction of a corrupted file signature to retrieve a hidden flag
 ---
 
-# Corrupted File
+Corrupted File is a Capture The Flag (CTF) challenge designed to test participants' ability to identify and correct a corrupted file signature to extract contents and find a hidden flag. The challenge involves examining and fixing a file with a corrupted signature.
 
-## Challenge Description
+#### Directory Structure
+```
+Corrupted_File/
+├── app/
+│   └── main.py
+├── Dockerfile
+├── requirements.txt
+└── docker-compose.yml
+```
 
-[Description of the Corrupted File challenge]
+## Technical Implementation
 
-## Difficulty
+### Architecture
 
-[Easy/Medium/Hard]
+The challenge uses a microservice architecture built with the following components:
 
-## Hints
+1. **FastAPI Application** (`main.py`): Handles the flag generation and serving the corrupted file.
+2. **Docker Environment** (`Dockerfile` and `docker-compose.yml`): Sets up the containerized environment.
 
-1. [Hint 1]
-2. [Hint 2]
-3. [Hint 3]
+### Component 1: FastAPI Application (`main.py`)
 
-## Solution
+The main.py script is the core of this challenge. It generates a flag by combining a team key and a challenge key, creates a file with this flag, compresses it into a tar.gz archive, and deliberately corrupts the file signature by replacing the first two bytes to hide the file type.
 
-[Solution details to be added]
+#### Full Source Code:
+
+```python
+import hashlib
+import os
+import tarfile
+
+from dotenv import load_dotenv
+from fastapi import FastAPI
+from fastapi.responses import FileResponse
+
+if os.environ.get("TEAMKEY") is None:
+    load_dotenv()
+
+debug = os.getenv("DEBUG", "False") == "True"
+print(debug)
+
+team_key = os.getenv("TEAMKEY")
+challenge_key = "kjasdhasidz8a2e2kwhdoizdshdmas"
+combined_flag = challenge_key + team_key
+hashed_flag = f"FF{{{hashlib.sha256(combined_flag.encode()).hexdigest()}}}"
+if debug:
+    print(f"Team Key: {team_key}")
+    print(f"Challenge Key: {challenge_key}")
+    print(f"Flag: {hashed_flag}")
+
+# create a text file with the flag
+with open("flag.txt", "w") as f:
+    f.write(hashed_flag)
+
+# compress the file to a tar.gz file
+with tarfile.open("document", "w:gz") as tar:
+    tar.add("flag.txt")
+
+# replace the first two bytes from the archive from 0x1f 0x8b to 0x00 0x00 to hide the file type
+# makes it practically impossible without altering the bytes back
+with open("document", "r+b") as f:
+    f.seek(0)  # Move to the beginning of the file
+    f.write(b"\x00\x00")  # Write the new bytes
+
+
+app = FastAPI()
+
+
+@app.get("/")
+def read_root():
+    file_path = "document"
+    # send some additional headers because firefox can't be normal
+    headers = {"Content-Disposition": 'attachment; filename="document"'}
+    return FileResponse(file_path, headers=headers)
+```
+
+#### Key Features:
+
+1. **Flag Generation**: Combines a team key and challenge key, then hashes them to create the flag.
+2. **File Compression**: Compresses the flag file into a tar.gz archive.
+3. **Signature Corruption**: Deliberately corrupts the gzip file signature by replacing the first two bytes.
+4. **File Serving**: Uses FastAPI to serve the corrupted file to users.
+
+### Component 2: Docker Environment (`docker-compose.yml`)
+
+The Docker environment sets up the containerized service for running the challenge.
+
+#### Docker Compose File:
+
+```yaml
+version: '3'
+
+services:
+  challenge:
+    container_name: corrupted-file
+    build: .
+    ports:
+      - '80:80'
+    environment:
+      - TEAMKEY=team1
+      - CHALLENGE=Cupped0-Many7
+      - DEBUG="False"
+```
+
+#### Dockerfile:
+
+```dockerfile
+FROM python:3.9
+
+WORKDIR /code
+
+COPY ./requirements.txt /code/requirements.txt
+
+RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
+
+COPY ./app /code/app
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "80"]
+```
+
+#### Key Features:
+
+1. **Environment Setup**: Configures the Python environment with necessary dependencies.
+2. **Challenge Configuration**: Sets environment variables for the team key and challenge key.
+3. **Service Deployment**: Maps port 80 for web access to the challenge.
+
+**HAVE FUN**
+
+## Challenge Writeup
+
+### Step 1: Identify the Corruption
+
+The provided file has its first two bytes altered from `0x1f 0x8b` (the signature for a gzip file) to `0x00 0x00`. Use a hex editor or a similar tool to inspect the first few bytes of the file.
+
+### Step 2: Correct the File Signature
+
+Change the first two bytes back to `0x1f 0x8b` to restore the gzip file signature. This can be done using a hex editor or a Python script like the one below:
+
+```python
+import os
+
+def correct_file_signature(file_path):
+    try:
+        if not os.path.isfile(file_path):
+            raise FileNotFoundError(f"The file '{file_path}' does not exist.")
+        
+        with open(file_path, 'r+b') as f:
+            f.seek(0)  # Move to the beginning of the file
+            f.write(b'\x1f\x8b')  # Write the correct gzip signature
+        print(f"File signature corrected for: {file_path}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+# Usage
+# Replace 'document' with the actual file path
+correct_file_signature('document')
+```
+
+### Step 3: Extract the Contents
+
+Once the file signature is corrected, use a tool like `tar` to extract the contents of the tar.gz archive. This will extract the `flag.txt` file containing the flag.
+
+```sh
+tar -xzf document
+```
+
+### Key Insights
+
+1. File signatures (magic bytes) are crucial for identifying file types.
+2. Corrupting these signatures can make files unrecognizable to standard tools.
+3. Understanding file formats allows for manual repair of corrupted files.
+
+### Tools Used
+
+* Hex editor
+* Python
+* tar command-line utility
