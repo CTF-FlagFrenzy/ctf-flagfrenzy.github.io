@@ -1,0 +1,54 @@
+---
+title: "CTF Anti-Cheat | Database"
+description: Overview of the CTF FlagFrenzy anti-cheat database implementation.
+---
+
+The database stores all necessary information to ensure the integrity of the CTF competition. It tracks flag submissions, shared flags, penalties, and team progress over time. This data is critical for validating submissions, detecting suspicious activity, and providing insights through the admin panel.
+
+## Technology Stack
+
+- MySQL
+
+## Structure
+
+In the following figure, you can see the ER-Diagram of the Anti-Cheat Database. The database is designed to handle dynamic and static flags, track shared flags, and log penalties for invalid submissions.  
+![alt text](../../../../assets/backend/ER-Diagram.png)
+
+| Table Name            | Foreign Key           | Description                                                                                     |
+|-----------------------|-----------------------|-------------------------------------------------------------------------------------------------|
+| **FlagSubmission**    | TeamID, ChallengeID  | Tracks all flag submissions, including their status (successful, invalid, or shared) and timestamps. |
+| **SharedFlagSubmission** | TeamID, ChallengeID, OriginalTeamID | Logs flags that have been submitted by multiple teams, including the original team that submitted the flag. |
+| **TeamPoints**        | TeamID               | Tracks team points over time, including penalties for invalid submissions.                      |
+| **Challenges**        | /                    | Stores challenge details, including whether the challenge uses a static or dynamic flag.        |
+| **Teams**             | /                    | Tracks team details, including shared flag counts and whether the team is disabled.             |
+| **Users**             | TeamsID              | Tracks user details, including points and their associated team.                                |
+
+---
+
+### Table Descriptions
+
+1. **FlagSubmission**:
+   - Tracks all flag submissions made by teams.
+   - Stores the flag, the associated challenge, the team that submitted it, the submission status (e.g., successful, invalid, shared), and the timestamp of the submission.
+
+2. **SharedFlagSubmission**:
+   - Logs flags that have been submitted by multiple teams.
+   - Tracks the original team that submitted the flag, the challenge, and the timestamp of the shared submission.
+   - Used to detect and penalize teams for sharing flags.
+
+3. **TeamPoints**:
+   - Tracks team points over time, including penalties applied for invalid submissions.
+   - Used for generating graphs in the admin panel and monitoring team progress.
+
+4. **Challenges**:
+   - Stores challenge details, including the flag type (static or dynamic), points, and difficulty.
+   - Includes attributes for hints and references to chained challenges.
+
+5. **Teams**:
+   - Tracks team details, including their points, shared flag count, and whether the team is disabled due to suspicious activity.
+
+6. **Users**:
+   - Tracks user details, including their points and associated team.
+   - Used to link users to their submissions and challenges.
+
+---

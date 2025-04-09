@@ -61,18 +61,30 @@ export default defineConfig({
               label: 'Frontend',
               items: [
                 { label: 'Frontend | Overview', link: '/webapp/frontend/overview' },
+                { label: 'Frontend | Authentication', link: '/webapp/frontend/authentication' },
+                { label: 'Frontend | Layout & Index Page', link: '/webapp/frontend/layout-index-page' },
+                { label: 'Frontend | Challenge Page', link: '/webapp/frontend/challenge-page' },
+                { label: 'Frontend | Scoreboard Page', link: '/webapp/frontend/scoreboard-page' },
+                { label: 'Frontend | Team & Profile Page', link: '/webapp/frontend/team-profile-page' },
+
               ]
             },
             {
               label: 'Backend',
               items: [
                 { label: 'Backend | Overview', link: '/webapp/backend/overview' },
+                { label: 'Backend | API', link: '/webapp/backend/api' },
+                { label: 'Backend | Database', link: '/webapp/backend/database' },
+
+
               ]
             },
             {
               label: 'Anti Cheat',
               items: [
                 { label: 'Anti Cheat | Overview', link: '/webapp/anti-cheat/overview' },
+                { label: 'Anti Cheat | Database', link: '/webapp/anti-cheat/database' },
+                { label: 'Anti Cheat | API', link: '/webapp/anti-cheat/api' },
               ]
             },
 					],

@@ -1,0 +1,53 @@
+---
+title: Challenges Page
+description: Overview of the CTF FlagFrenzy Challenge Page and the relating components
+---
+
+This is the page where all the challenges are displayed. A challenge is displayed in a card with the card.svelte component, there can be 4 per row. The card shows some information about the challenge like name, difficulty, part of the description and status. It acts as a button to open the popup (Modal.svelte), there everything about the challenge is displayed and the there is also the interaction menu. The interactions are start, submit, flag input, open challenge and flag history.
+
+### Functions
+This are the most important functions of the page.
+
+| Function | Description | Note |
+|------------|------------|------------|
+| loadChallenges | This is the function that loads all the challenges. | All sorted by category |
+| loadUsermadeChallenges | This is the function that checks which challenges are solved or started. | |
+
+### Variables
+This are the most important variables of the page.
+
+| Variable | Description | Note |
+|------------|------------|------------|
+| interval | The time interval for next refresh of the challenges data. | Default is 10 seconds |
+
+### Functions card.svelte
+This are the most important functions of the page.
+
+| Function | Description | Note |
+|------------|------------|------------|
+| openModal | This is the function that opens the popup (Modal.svelte) of the challenge. | |
+| colorPicker | Chooses the color for the shadow and heading based on the difficulty. | |
+
+### Functions Modal.svelte
+This are the most important functions of the page.
+
+| Function | Description | Note |
+|------------|------------|------------|
+| setLocal | Saves the load data in a second variable. | Prevents return of the load simbole |
+| loadHints | Loads the hints of the specific challenge. | Only the available ones |
+| checkChainCondition | Checks if the user has done the previous challenge. | Some challenges are only doable if another one is done beforehand |
+| startChallenge | Creates an entry in the DB for the start of the challenge. | Starts the deploy function |
+| deploy | Sends a container deploy request for the challenge. | Creates the container for the whole team |
+| submitChallenge | Updates the DB entry. | |
+| submitButton | Validates the dinamyc flag and gives points if right. | |
+| submit | Chooses chooses between static and dinamyc flag. | Chooses betweeen the followup functions submitButton and submitStatic |
+| SubmitStatic | Validates the static flag and gives points if right. | |
+| checkIfStarted | Checks if the URL for the container is in the DB. | |
+| Flag_history | Loads all previous entered flaggs for a challenge. | Only wrong ones plus the penalty information |
+
+### Variables
+This are the most important variables of the page.
+
+| Variable | Description | Note |
+|------------|------------|------------|
+| refreshInterval | The time interval for next refresh. | Default is 5 seconds |

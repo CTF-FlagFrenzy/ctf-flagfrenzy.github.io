@@ -1,0 +1,61 @@
+---
+title: Team & Profile Page
+description: Overview of the CTF FlagFrenzy Team & Profile Pages and their components
+---
+
+## Team Page
+This is the page where all teams are shown. The page is started with the heading, followed by a searchbar. By entering in the searchbar the below list off all teams is filtered for the matches with the input. To easily find the own team in the list it is dislayed in a brighter color. Next to the searchbar is a create team button which open the TeamCreateModal.svelte . Every entry in the list is at the same time a button to open the TeamModal.svelte . This popup showes more information about a team, like the members and who the leader is. Below this information is the interaction menu, containing the join, leave or delete button. These are as long visible as the event is not started or the team is already full.
+
+### Functions
+This are the most important functions of the page.
+
+| Function | Description | Note |
+|------------|------------|------------|
+| loadTeams | This is the function that loads all teams. | |
+| loadTeamMember | This is the function that loads the own team members. | |
+
+### Functions CreateTeamModal.svelte
+This are the most important functions of the page.
+
+| Function | Description | Note |
+|------------|------------|------------|
+| addTeam | This is the function that creates the new team. | Starts the join team afterwards |
+| joinTeam | This is the function that joins the user to a team. | |
+
+### Functions TeamModal.svelte
+This are the most important functions of the page.
+
+| Function | Description | Note |
+|------------|------------|------------|
+| joinTeam | This is the function that joins the user to a team. | To join a team if not full or already in a team |
+| deleteTeam | This is the function that deletes a whole team. | Only be done by leader |
+| leaveTeam | This is the function to leave a team. | Ony be done by member not leader |
+| checkExpiration | This is the function that checks if the event has started. | Deactivates things like team join, delete or leave |
+
+### Variables TeamModal.svelte
+This are the most important variables of the page.
+
+| Variable | Description | Note |
+|------------|------------|------------|
+| deadline | Contain the data where the event starts. | |
+
+## Profile Page
+This is the page where the user information is displayed. The page uses mainly svg to create the ellipse in the middle, in which the user avatar is placed and arounf it the team place, the team name and team points are displayed. Around the ellipse there is the username, class, email and nickname. The pages allows it to only change the avatar or the nickname. Eith the change of the avatar the shadow might also change, because it is connected to it.
+
+### Functions
+This are the most important functions of the page.
+
+| Function | Description | Note |
+|------------|------------|------------|
+| updateUser | This is the function that updates the user data in the db. | Only nickname and avatar |
+| selectAvatar | This is the function that provides the slider functionality for the avatar slider. | |
+| getShadowFilter | This is the function that provides the shadow for the respective avatar. |
+| getAvatarColor | This is the function that provides the color for the respective avatar. | |
+| splitText | This is the function that splits the teamname to make sure there is no overflow. | |
+
+### Variables
+This are the most important variables of the page.
+
+| Variable | Description | Note |
+|------------|------------|------------|
+| avatars | Contain the paths for every avatar which is chooseable. | |

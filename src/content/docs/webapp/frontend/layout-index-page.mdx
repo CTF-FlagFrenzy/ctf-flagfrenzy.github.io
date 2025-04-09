@@ -1,0 +1,43 @@
+---
+title: Layout & Index Page
+description: Overview of the CTF FlagFrenzy Layout & Index Pages and their components
+---
+
+## Layout.svelte
+This page is a part of every page of the Webapp, mainly divided in 3 parts. The first part is the navigation, with the logo, the links and the dropdown menu. THe second part is the filler where the content of the other pages is load into and the last part is the Footer.svelte component which is load into.
+
+### Functions
+This are the most important functions of the page.
+
+| Function | Description | Note |
+|------------|------------|------------|
+| addUser | This is the function that saves the user data from Azure into the DB. | The function is only started if the getUser function does not get results |
+| getUser | This is the function that loads the user data from the DB to use it in the frontend. | |
+| togglemenu | This is the function that open the full screen menu overlay | Is only viewable on smaller screens |
+| togglemenu2 | This is the function that open the dropdown menu. | The menu which appears under the avatar |
+
+### Variables
+This are the most important variables of the page.
+
+| Variable | Description | Note |
+|------------|------------|------------|
+| currentPath | This is the variable which is used to show the current tab. | Shown through the underline |
+
+## Index Page
+
+The index page is the first page where the user lands after the login. The contents of the page are simple, starting with a image of a slogan and a welcoming text. Followed by a slider for the sponsors and as last the list of rules.
+
+### Functions
+This are the most important functions of the page.
+
+| Function | Description | Note |
+|------------|------------|------------|
+| nextSlide | This is the function for the buttons of the slider to switch between pages. | Number after the % to the number of slides |
+
+### Variables
+This are the most important variables of the page.
+
+| Variable | Description | Note |
+|------------|------------|------------|
+| slides | This is the variable which stores all the information for the slider. | A slide needs a text, path to logo and background, link url |
+| interval | The time interval for the change to the next slide. | Default is 10 seconds |
