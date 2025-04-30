@@ -39,7 +39,6 @@ Open your browser and navigate to the URL shown in your terminal after starting 
 npm run build
 ```
 
-
 ### Troubleshooting
 
 - **Port Already in Use**: If the default port is already in use, Astro will automatically try to use the next available port.
